@@ -1,0 +1,22 @@
+{
+  "rpcs": [
+    {
+      "name": "GetUser",
+      "full_name": "admin.v1.AdminService.GetUser",
+      "service": "admin.v1.AdminService",
+      "request_type": "user.v1.GetUserRequest",
+      "response_type": "user.v1.GetUserResponse",
+      "client_streaming": false,
+      "server_streaming": false
+    },
+    {
+      "name": "BanUser",
+      "full_name": "admin.v1.AdminService.BanUser",
+      "service": "admin.v1.AdminService",
+      "request_type": "admin.v1.BanUserRequest",
+      "response_type": "admin.v1.BanUserResponse",
+      "client_streaming": false,
+      "server_streaming": false
+    }
+  ]
+}

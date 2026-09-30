@@ -1,0 +1,146 @@
+{
+  "rpc": {
+    "name": "CreateUser",
+    "full_name": "user.v1.UserService.CreateUser",
+    "service": "user.v1.UserService",
+    "request_type": "user.v1.CreateUserRequest",
+    "response_type": "user.v1.CreateUserResponse",
+    "client_streaming": false,
+    "server_streaming": false,
+    "request": {
+      "name": "CreateUserRequest",
+      "full_name": "user.v1.CreateUserRequest",
+      "fields": [
+        {
+          "name": "name",
+          "json_name": "name",
+          "number": 1,
+          "type": "string",
+          "has_presence": false
+        },
+        {
+          "name": "nickname",
+          "json_name": "nickname",
+          "number": 2,
+          "type": "string",
+          "label": "optional",
+          "has_presence": true
+        },
+        {
+          "name": "age",
+          "json_name": "age",
+          "number": 3,
+          "type": "int32",
+          "label": "optional",
+          "has_presence": true
+        },
+        {
+          "name": "status",
+          "json_name": "status",
+          "number": 4,
+          "type": "user.v1.UserStatus",
+          "has_presence": false,
+          "enum_values": [
+            "USER_STATUS_UNSPECIFIED",
+            "USER_STATUS_ACTIVE",
+            "USER_STATUS_DISABLED"
+          ]
+        },
+        {
+          "name": "tags",
+          "json_name": "tags",
+          "number": 5,
+          "type": "string",
+          "label": "repeated",
+          "has_presence": false
+        },
+        {
+          "name": "profile",
+          "json_name": "profile",
+          "number": 6,
+          "type": "user.v1.Profile",
+          "has_presence": true
+        },
+        {
+          "name": "labels",
+          "json_name": "labels",
+          "number": 7,
+          "type": "map<string, string>",
+          "has_presence": false
+        },
+        {
+          "name": "email",
+          "json_name": "email",
+          "number": 8,
+          "type": "string",
+          "oneof": "contact",
+          "has_presence": true
+        },
+        {
+          "name": "phone",
+          "json_name": "phone",
+          "number": 9,
+          "type": "string",
+          "oneof": "contact",
+          "has_presence": true
+        },
+        {
+          "name": "admin",
+          "json_name": "admin",
+          "number": 10,
+          "type": "bool",
+          "label": "optional",
+          "has_presence": true
+        },
+        {
+          "name": "addresses",
+          "json_name": "addresses",
+          "number": 11,
+          "type": "user.v1.Address",
+          "label": "repeated",
+          "has_presence": false
+        },
+        {
+          "name": "scores",
+          "json_name": "scores",
+          "number": 12,
+          "type": "map<int32, string>",
+          "has_presence": false
+        },
+        {
+          "name": "places",
+          "json_name": "places",
+          "number": 13,
+          "type": "map<string, user.v1.Address>",
+          "has_presence": false
+        },
+        {
+          "name": "history",
+          "json_name": "history",
+          "number": 14,
+          "type": "user.v1.UserStatus",
+          "label": "repeated",
+          "has_presence": false,
+          "enum_values": [
+            "USER_STATUS_UNSPECIFIED",
+            "USER_STATUS_ACTIVE",
+            "USER_STATUS_DISABLED"
+          ]
+        }
+      ]
+    },
+    "response": {
+      "name": "CreateUserResponse",
+      "full_name": "user.v1.CreateUserResponse",
+      "fields": [
+        {
+          "name": "user",
+          "json_name": "user",
+          "number": 1,
+          "type": "user.v1.User",
+          "has_presence": true
+        }
+      ]
+    }
+  }
+}

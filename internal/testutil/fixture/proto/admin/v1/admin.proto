@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package admin.v1;
+
+import "user/v1/user.proto";
+
+message BanUserRequest {
+  string id = 1;
+  string reason = 2;
+}
+
+message BanUserResponse {
+  user.v1.User user = 1;
+}
+
+service AdminService {
+  rpc GetUser(user.v1.GetUserRequest) returns (user.v1.GetUserResponse);
+  rpc BanUser(BanUserRequest) returns (BanUserResponse);
+}

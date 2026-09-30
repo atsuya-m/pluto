@@ -1,0 +1,24 @@
+rpc user.v1.UserService.CreateUser (user.v1.CreateUserRequest) returns (user.v1.CreateUserResponse)
+
+message user.v1.CreateUserRequest {
+  string name = 1;
+  optional string nickname = 2;
+  optional int32 age = 3;
+  user.v1.UserStatus status = 4;  // USER_STATUS_UNSPECIFIED | USER_STATUS_ACTIVE | USER_STATUS_DISABLED
+  repeated string tags = 5;
+  user.v1.Profile profile = 6;
+  map<string, string> labels = 7;
+  optional bool admin = 10;
+  repeated user.v1.Address addresses = 11;
+  map<int32, string> scores = 12;
+  map<string, user.v1.Address> places = 13;
+  repeated user.v1.UserStatus history = 14;  // USER_STATUS_UNSPECIFIED | USER_STATUS_ACTIVE | USER_STATUS_DISABLED
+  oneof contact {
+    string email = 8;
+    string phone = 9;
+  }
+}
+
+message user.v1.CreateUserResponse {
+  user.v1.User user = 1;
+}

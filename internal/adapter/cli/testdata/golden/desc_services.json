@@ -1,0 +1,26 @@
+{
+  "services": [
+    {
+      "name": "AdminService",
+      "full_name": "admin.v1.AdminService",
+      "rpcs": [
+        "GetUser",
+        "BanUser"
+      ]
+    },
+    {
+      "name": "UserService",
+      "full_name": "user.v1.UserService",
+      "rpcs": [
+        "CreateUser",
+        "GetUser",
+        "ListUsers",
+        "UpdateUser",
+        "DeleteUser",
+        "WatchUsers",
+        "ImportUsers",
+        "Chat"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "error": {
+    "code": "ambiguous_symbol",
+    "message": "ambiguous symbol \"GetUser\" matches 2 candidates",
+    "candidates": [
+      "admin.v1.AdminService.GetUser",
+      "user.v1.UserService.GetUser"
+    ]
+  }
+}

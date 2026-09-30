@@ -1,0 +1,29 @@
+{
+  "message": {
+    "name": "Profile",
+    "full_name": "user.v1.Profile",
+    "fields": [
+      {
+        "name": "bio",
+        "json_name": "bio",
+        "number": 1,
+        "type": "string",
+        "has_presence": false
+      },
+      {
+        "name": "avatar_url",
+        "json_name": "avatarUrl",
+        "number": 2,
+        "type": "string",
+        "has_presence": false
+      },
+      {
+        "name": "address",
+        "json_name": "address",
+        "number": 3,
+        "type": "user.v1.Address",
+        "has_presence": true
+      }
+    ]
+  }
+}

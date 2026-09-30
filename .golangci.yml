@@ -1,0 +1,41 @@
+version: "2"
+
+linters:
+  enable:
+    - depguard
+  settings:
+    depguard:
+      rules:
+        bubbletea-only-in-tui:
+          files:
+            - "$all"
+            - "!**/internal/adapter/tui/**"
+          deny:
+            - pkg: github.com/charmbracelet
+              desc: Bubble Tea / Bubbles / Lip Gloss must stay inside internal/adapter/tui
+        domain-is-pure:
+          files:
+            - "**/internal/domain/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/atsuya-m/pluto/internal/application
+              desc: domain must not depend on application
+            - pkg: github.com/atsuya-m/pluto/internal/adapter
+              desc: domain must not depend on adapters
+            - pkg: github.com/atsuya-m/pluto/internal/infrastructure
+              desc: domain must not depend on infrastructure
+            - pkg: connectrpc.com
+              desc: domain must not depend on transports
+            - pkg: net/http
+              desc: domain must not depend on transports
+        application-has-no-infrastructure:
+          files:
+            - "**/internal/application/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/atsuya-m/pluto/internal/adapter
+              desc: application must not depend on adapters
+            - pkg: github.com/atsuya-m/pluto/internal/infrastructure
+              desc: application must not depend on infrastructure
+            - pkg: connectrpc.com
+              desc: application must not know about transports
