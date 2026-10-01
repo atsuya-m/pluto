@@ -7,9 +7,9 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/atsuya-m/pluto/internal/adapter/presenter/errdetail"
+	"github.com/atsuya-m/pluto/internal/adapter/tui/clipboard"
 	"github.com/atsuya-m/pluto/internal/adapter/tui/commandline"
 	"github.com/atsuya-m/pluto/internal/adapter/tui/jsonview"
 	"github.com/atsuya-m/pluto/internal/adapter/tui/requesteditor"
@@ -31,26 +31,24 @@ const (
 )
 
 type KeyMap struct {
-	Quit      key.Binding
-	Send      key.Binding
-	Edit      key.Binding
-	CallAgain key.Binding
-	Back      key.Binding
-	Finish    key.Binding
-	Explore   key.Binding
-	Print     key.Binding
+	Quit    key.Binding
+	Send    key.Binding
+	Edit    key.Binding
+	Back    key.Binding
+	Finish  key.Binding
+	Explore key.Binding
+	Print   key.Binding
 }
 
 func DefaultKeyMap() KeyMap {
 	return KeyMap{
-		Quit:      key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit")),
-		Send:      key.NewBinding(key.WithKeys("enter", "ctrl+s"), key.WithHelp("enter", "send")),
-		Edit:      key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit request")),
-		CallAgain: key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "call again")),
-		Back:      key.NewBinding(key.WithKeys("esc", "q", "ctrl+g"), key.WithHelp("q/esc", "back")),
-		Finish:    key.NewBinding(key.WithKeys("ctrl+x"), key.WithHelp("C-x", "finish sending")),
-		Explore:   key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "explore")),
-		Print:     key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "print")),
+		Quit:    key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit")),
+		Send:    key.NewBinding(key.WithKeys("enter", "ctrl+s"), key.WithHelp("enter", "send")),
+		Edit:    key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit request")),
+		Back:    key.NewBinding(key.WithKeys("esc", "q", "ctrl+g"), key.WithHelp("q/esc", "back")),
+		Finish:  key.NewBinding(key.WithKeys("ctrl+x"), key.WithHelp("C-x", "finish sending")),
+		Explore: key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "explore")),
+		Print:   key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "print")),
 	}
 }
 
@@ -90,10 +88,9 @@ type Model struct {
 	streamCount  int
 	stopping     bool
 
-	session      *usecase.StreamSession
-	sentCount    int
-	sendSeq      int
-	sentMessages []proto.Message
+	session   *usecase.StreamSession
+	sentCount int
+	sendSeq   int
 
 	headers http.Header
 	saved   []usecase.SavedRequestSummary
@@ -102,6 +99,7 @@ type Model struct {
 	lastBody  string
 	viewer    jsonview.Model
 	exploring bool
+	notice    string
 }
 
 func NewModel(ctx context.Context, deps Dependencies) Model {
@@ -110,6 +108,12 @@ func NewModel(ctx context.Context, deps Dependencies) Model {
 	sp.Style = style.Prompt
 	command := commandline.New()
 	command.SetHeaderKeys(headerKeys(deps.Headers))
+	if deps.Clipboard == nil {
+		deps.Clipboard = func(text string) (string, error) {
+			method, err := clipboard.Write(text)
+			return string(method), err
+		}
+	}
 	return Model{
 		ctx:      ctx,
 		deps:     deps,

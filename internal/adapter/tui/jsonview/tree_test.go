@@ -161,3 +161,23 @@ func TestSearchAndReveal(t *testing.T) {
 		t.Error("blank query should match nothing")
 	}
 }
+
+func TestCopyText(t *testing.T) {
+	root, _ := Parse([]byte(`{"s":"a \"q\" b","n":1.5,"b":true,"z":null,"o":{"x":[1,{"y":"z"}],"e":{},"a":[]}}`))
+	byKey := map[string]*Node{}
+	for _, c := range root.Children {
+		byKey[c.Key] = c
+	}
+	tests := map[string]string{
+		"s": `a "q" b`,
+		"n": "1.5",
+		"b": "true",
+		"z": "null",
+		"o": "{\n  \"x\": [\n    1,\n    {\n      \"y\": \"z\"\n    }\n  ],\n  \"e\": {},\n  \"a\": []\n}",
+	}
+	for k, want := range tests {
+		if got := byKey[k].CopyText(); got != want {
+			t.Errorf("%s: CopyText = %q, want %q", k, got, want)
+		}
+	}
+}

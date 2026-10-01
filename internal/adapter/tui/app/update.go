@@ -97,7 +97,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.editor.SetSize(m.width, m.height)
 		m.hasEditor = true
 		m.mode = ModeRequestEditor
-		m.sentMessages = nil
 		return m, restoredNotice(msg.Output)
 
 	case invokedMsg:
@@ -136,7 +135,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case streamSentMsg:
 		m.sentCount++
-		m.sentMessages = append(m.sentMessages, msg.Message)
+		return m, nil
+
+	case jsonview.CopyMsg:
+		return m, copyToClipboard(m.deps.Clipboard, msg.Text, msg.Label)
+
+	case copiedMsg:
+		if msg.Err != nil {
+			m.notice = style.Error.Render("✘ copy failed: " + msg.Err.Error())
+		} else {
+			m.notice = style.Success.Render("✔ copied") + style.Subtle.Render(fmt.Sprintf(" %s (%d chars, %s)", msg.Label, msg.Length, msg.Method))
+		}
 		return m, nil
 
 	case streamSendFailedMsg:
@@ -389,7 +398,6 @@ func (m Model) beginStream(pending []proto.Message, finish bool) (tea.Model, tea
 	m.streamCount = 0
 	m.sentCount = 0
 	m.sendSeq = 0
-	m.sentMessages = nil
 	m.stopping = false
 	rpc := m.editor.RPC()
 	if finish {
@@ -404,13 +412,6 @@ func (m Model) beginStream(pending []proto.Message, finish bool) (tea.Model, tea
 }
 
 func (m Model) startInvoke() (tea.Model, tea.Cmd) {
-	if m.editor.RPC().ClientStreaming {
-		replay := m.sentMessages
-		if len(replay) == 0 {
-			replay = []proto.Message{m.editor.Builder().Message()}
-		}
-		return m.beginStream(replay, true)
-	}
 	ctx, cancel := context.WithCancel(m.ctx)
 	m.cancel = cancel
 	rpc := m.editor.RPC()
@@ -485,6 +486,7 @@ func (m Model) updateResponse(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
+	m.notice = ""
 	if m.exploring && m.viewer.Searching() {
 		var cmd tea.Cmd
 		m.viewer, cmd = m.viewer.Update(k)
@@ -502,14 +504,12 @@ func (m Model) updateResponse(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Println(m.body)
 	}
-	if m.exploring && !key.Matches(k, m.keys.CallAgain) && !key.Matches(k, m.keys.Edit) && !key.Matches(k, m.keys.Back) {
+	if m.exploring && !key.Matches(k, m.keys.Edit) && !key.Matches(k, m.keys.Back) {
 		var cmd tea.Cmd
 		m.viewer, cmd = m.viewer.Update(k)
 		return m, cmd
 	}
 	switch {
-	case key.Matches(k, m.keys.CallAgain):
-		return m.startInvoke()
 	case key.Matches(k, m.keys.Edit):
 		m.mode = ModeRequestEditor
 		m.exploring = false

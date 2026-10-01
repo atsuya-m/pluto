@@ -69,4 +69,6 @@ type Dependencies struct {
 	Protocol     string
 	SchemaSource string
 	Profile      string
+
+	Clipboard func(text string) (method string, err error)
 }

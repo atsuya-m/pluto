@@ -226,3 +226,10 @@ func describe(ctx context.Context, rpc DescribeRPCUseCase, msg DescribeMessageUs
 		return printMsg{Text: strings.TrimRight(textpresenter.MessageString(out.Message), "\n")}
 	}
 }
+
+func copyToClipboard(write func(string) (string, error), text, label string) tea.Cmd {
+	return func() tea.Msg {
+		method, err := write(text)
+		return copiedMsg{Label: label, Length: len([]rune(text)), Method: method, Err: err}
+	}
+}

@@ -161,3 +161,17 @@ func TestModel_ScrollAndView(t *testing.T) {
 		t.Error("cursor marker missing")
 	}
 }
+
+func TestModel_CopyMsgs(t *testing.T) {
+	m := newModel(t, 40)
+	m = typeRunes(m, "j")
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	msg, ok := cmd().(CopyMsg)
+	if !ok || msg.Text != "u-1" || msg.Label != ".user.id" {
+		t.Errorf("y msg = %#v", cmd())
+	}
+	_, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Y'}})
+	if msg, ok := cmd().(CopyMsg); !ok || msg.Text != ".user.id" {
+		t.Errorf("Y msg = %#v", cmd())
+	}
+}

@@ -46,13 +46,14 @@ func (f *fakeInvokeRPC) callCount() int {
 }
 
 type harness struct {
-	t       *testing.T
-	model   tea.Model
-	printed []string
-	invoke  *fakeInvokeRPC
-	late    chan tea.Msg
-	store   *memstore.Store
-	opener  *chanOpener
+	t         *testing.T
+	model     tea.Model
+	printed   []string
+	invoke    *fakeInvokeRPC
+	late      chan tea.Msg
+	store     *memstore.Store
+	opener    *chanOpener
+	clipboard []string
 }
 
 func newHarness(t *testing.T, invoke func(context.Context, usecase.InvokeRPCInput) (usecase.InvokeRPCOutput, error)) *harness {
@@ -77,6 +78,10 @@ func newHarness(t *testing.T, invoke func(context.Context, usecase.InvokeRPCInpu
 		Protocol:        "connect",
 	})
 	h := &harness{t: t, model: m, invoke: fake, late: make(chan tea.Msg, 64), store: store, opener: opener}
+	h.model = withClipboard(h.app(), func(text string) (string, error) {
+		h.clipboard = append(h.clipboard, text)
+		return "fake", nil
+	})
 	h.send(tea.WindowSizeMsg{Width: 100, Height: 40})
 	h.run(loadRPCs(context.Background(), usecase.NewListRPCs(loader)))
 	return h
@@ -227,8 +232,8 @@ func TestApp_CallFlow(t *testing.T) {
 	}
 
 	h.typeText("c")
-	if h.invoke.callCount() != 2 {
-		t.Errorf("call again: calls = %d", h.invoke.callCount())
+	if h.invoke.callCount() != 1 {
+		t.Errorf("c must not resend the request: calls = %d", h.invoke.callCount())
 	}
 
 	h.typeText("e")
@@ -634,11 +639,8 @@ func TestApp_ClientStreamCompose(t *testing.T) {
 	}
 
 	h.typeText("c")
-	waitFor(t, h, func() bool {
-		return h.app().Mode() == ModeResponseViewer && len(h.opener.headers) == 2 && h.app().sentCount == 2
-	})
-	if !strings.Contains(h.app().View(), "2 sent · 1 received") {
-		t.Errorf("call again should replay both messages:\n%s", h.app().View())
+	if len(h.opener.headers) != 1 {
+		t.Errorf("c must not reopen the stream: opened %d times", len(h.opener.headers))
 	}
 }
 
@@ -852,5 +854,57 @@ func TestApp_FailedResponseHasNoExplorer(t *testing.T) {
 	h.typeText("v")
 	if h.app().exploring || strings.Contains(h.app().View(), "v explore") {
 		t.Errorf("errors have nothing to explore:\n%s", h.app().View())
+	}
+}
+
+func withClipboard(m Model, write func(string) (string, error)) Model {
+	m.deps.Clipboard = write
+	return m
+}
+
+func TestApp_CopyFromExplorer(t *testing.T) {
+	h := newHarness(t, okResponse(t))
+	h.submit("call CreateUser")
+	h.key(tea.KeyCtrlS)
+	h.key(tea.KeyEnter)
+	h.typeText("v")
+	h.typeText("jj")
+	if cur := h.app().viewer.Current(); cur == nil || cur.Path() != ".user.name" {
+		t.Fatalf("cursor at %v", cur)
+	}
+
+	h.typeText("y")
+	if len(h.clipboard) != 1 || h.clipboard[0] != "Taro" {
+		t.Fatalf("clipboard = %q", h.clipboard)
+	}
+	if v := h.app().View(); !strings.Contains(v, "✔ copied") || !strings.Contains(v, ".user.name (4 chars, fake)") {
+		t.Errorf("view should confirm the copy:\n%s", v)
+	}
+
+	h.typeText("Y")
+	if h.clipboard[1] != ".user.name" {
+		t.Errorf("Y should copy the path: %q", h.clipboard[1])
+	}
+	h.typeText("k")
+	if strings.Contains(h.app().View(), "✔ copied") {
+		t.Error("the notice should disappear on the next key")
+	}
+
+	h.typeText("gy")
+	if h.clipboard[2] != "{\n  \"id\": \"u-1\",\n  \"name\": \"Taro\"\n}" {
+		t.Errorf("copying an object should give pretty JSON: %q", h.clipboard[2])
+	}
+}
+
+func TestApp_CopyFailure(t *testing.T) {
+	h := newHarness(t, okResponse(t))
+	h.model = withClipboard(h.app(), func(string) (string, error) { return "", errors.New("no clipboard") })
+	h.submit("call CreateUser")
+	h.key(tea.KeyCtrlS)
+	h.key(tea.KeyEnter)
+	h.typeText("v")
+	h.typeText("y")
+	if !strings.Contains(h.app().View(), "copy failed: no clipboard") {
+		t.Errorf("view:\n%s", h.app().View())
 	}
 }

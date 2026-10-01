@@ -105,15 +105,19 @@ func (m Model) responseView() string {
 		head = style.Success.Render("✔ stream closed · " + streamCounts(m.result))
 	}
 	status := fmt.Sprintf("%s %s %s", head, m.result.rpc, style.Subtle.Render("("+m.result.duration+")"))
-	if m.exploring {
-		return status + "\n" + m.viewer.View() + "\n" +
-			style.Help.Render(m.viewer.Help()+" • p print • c again • e edit • q back")
+	notice := ""
+	if m.notice != "" {
+		notice = "\n" + m.notice
 	}
-	help := "c call again • e edit request • q/enter back"
+	if m.exploring {
+		return status + "\n" + m.viewer.View() + notice + "\n" +
+			style.Help.Render(m.viewer.Help()+" • p print • e edit • q back")
+	}
+	help := "e edit request • q/enter back"
 	if m.body != "" {
 		help = "v explore • p print • " + help
 	}
-	return status + "\n" + style.Help.Render(help)
+	return status + notice + "\n" + style.Help.Render(help)
 }
 
 func renderResponse(rpc usecase.RPCSummary, out usecase.InvokeRPCOutput, duration string) string {

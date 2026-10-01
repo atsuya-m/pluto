@@ -79,3 +79,10 @@ type requestSavedMsg struct {
 type requestDeletedMsg struct {
 	Name string
 }
+
+type copiedMsg struct {
+	Label  string
+	Length int
+	Method string
+	Err    error
+}

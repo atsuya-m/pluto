@@ -29,6 +29,13 @@ type KeyMap struct {
 	Prev        key.Binding
 	Commit      key.Binding
 	Cancel      key.Binding
+	CopyValue   key.Binding
+	CopyPath    key.Binding
+}
+
+type CopyMsg struct {
+	Text  string
+	Label string
 }
 
 func DefaultKeyMap() KeyMap {
@@ -49,6 +56,8 @@ func DefaultKeyMap() KeyMap {
 		Prev:        key.NewBinding(key.WithKeys("N")),
 		Commit:      key.NewBinding(key.WithKeys("enter")),
 		Cancel:      key.NewBinding(key.WithKeys("esc", "ctrl+g")),
+		CopyValue:   key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "copy value")),
+		CopyPath:    key.NewBinding(key.WithKeys("Y"), key.WithHelp("Y", "copy path")),
 	}
 }
 
@@ -228,6 +237,16 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.input.SetValue(m.query)
 		m.input.CursorEnd()
 		return m, m.input.Focus()
+	case key.Matches(k, m.keys.CopyValue):
+		if cur != nil {
+			msg := CopyMsg{Text: cur.CopyText(), Label: cur.Path()}
+			return m, func() tea.Msg { return msg }
+		}
+	case key.Matches(k, m.keys.CopyPath):
+		if cur != nil {
+			msg := CopyMsg{Text: cur.Path(), Label: "path " + cur.Path()}
+			return m, func() tea.Msg { return msg }
+		}
 	case key.Matches(k, m.keys.Next):
 		m.jump(1)
 	case key.Matches(k, m.keys.Prev):
@@ -391,5 +410,5 @@ func truncate(s string, w int) string {
 }
 
 func (m Model) Help() string {
-	return strings.Join([]string{"j/k move", "enter fold", "h/l", "L/H all", "1-9 depth", "/ search", "n/N"}, " • ")
+	return strings.Join([]string{"j/k move", "enter fold", "h/l", "L/H all", "/ search", "y/Y copy value/path"}, " • ")
 }

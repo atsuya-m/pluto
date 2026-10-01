@@ -256,3 +256,57 @@ func Search(root *Node, query string) []*Node {
 	})
 	return out
 }
+
+func (n *Node) CopyText() string {
+	switch n.Kind {
+	case KindString:
+		if v, err := strconv.Unquote(n.Value); err == nil {
+			return v
+		}
+		return n.Value
+	case KindObject, KindArray:
+		var b strings.Builder
+		writeJSON(&b, n, 0)
+		return b.String()
+	default:
+		return n.Value
+	}
+}
+
+func writeJSON(b *strings.Builder, n *Node, indent int) {
+	pad := strings.Repeat("  ", indent+1)
+	switch n.Kind {
+	case KindObject:
+		if len(n.Children) == 0 {
+			b.WriteString("{}")
+			return
+		}
+		b.WriteString("{\n")
+		for i, c := range n.Children {
+			b.WriteString(pad + strconv.Quote(c.Key) + ": ")
+			writeJSON(b, c, indent+1)
+			if i < len(n.Children)-1 {
+				b.WriteString(",")
+			}
+			b.WriteString("\n")
+		}
+		b.WriteString(strings.Repeat("  ", indent) + "}")
+	case KindArray:
+		if len(n.Children) == 0 {
+			b.WriteString("[]")
+			return
+		}
+		b.WriteString("[\n")
+		for i, c := range n.Children {
+			b.WriteString(pad)
+			writeJSON(b, c, indent+1)
+			if i < len(n.Children)-1 {
+				b.WriteString(",")
+			}
+			b.WriteString("\n")
+		}
+		b.WriteString(strings.Repeat("  ", indent) + "]")
+	default:
+		b.WriteString(n.Value)
+	}
+}
