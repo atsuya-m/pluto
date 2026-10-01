@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"net/http"
-	"path/filepath"
 
 	"github.com/atsuya-m/pluto/internal/application/port"
 	"github.com/atsuya-m/pluto/internal/application/usecase"
@@ -10,7 +9,6 @@ import (
 	"github.com/atsuya-m/pluto/internal/infrastructure/schema/cached"
 	"github.com/atsuya-m/pluto/internal/infrastructure/schema/proto"
 	"github.com/atsuya-m/pluto/internal/infrastructure/schema/reflection"
-	"github.com/atsuya-m/pluto/internal/infrastructure/store/file"
 	"github.com/atsuya-m/pluto/internal/infrastructure/transport/connect"
 )
 
@@ -26,9 +24,6 @@ type Application struct {
 	InvokeRPC       *usecase.InvokeRPC
 	InvokeStream    *usecase.InvokeServerStream
 	OpenStream      *usecase.OpenStream
-	SaveRequest     *usecase.SaveRequest
-	ListSaved       *usecase.ListSavedRequests
-	DeleteSaved     *usecase.DeleteSavedRequest
 }
 
 func New(cfg Config) (*Application, error) {
@@ -55,7 +50,6 @@ func New(cfg Config) (*Application, error) {
 		return nil, err
 	}
 	decoder := protojson.NewRequestDecoder()
-	store := requestStore(cfg)
 
 	return &Application{
 		Config:          cfg,
@@ -64,23 +58,9 @@ func New(cfg Config) (*Application, error) {
 		ListRPCs:        usecase.NewListRPCs(loader),
 		DescribeRPC:     usecase.NewDescribeRPC(loader),
 		DescribeMessage: usecase.NewDescribeMessage(loader),
-		PrepareRequest:  usecase.NewPrepareRequest(loader, decoder, usecase.WithRequestStore(store)),
+		PrepareRequest:  usecase.NewPrepareRequest(loader, decoder),
 		InvokeRPC:       usecase.NewInvokeRPC(loader, invoker),
 		InvokeStream:    usecase.NewInvokeServerStream(loader, invoker),
 		OpenStream:      usecase.NewOpenStream(loader, invoker),
-		SaveRequest:     usecase.NewSaveRequest(store),
-		ListSaved:       usecase.NewListSavedRequests(store),
-		DeleteSaved:     usecase.NewDeleteSavedRequest(store),
 	}, nil
-}
-
-func requestStore(cfg Config) port.RequestStore {
-	if cfg.StateDir != "" {
-		return file.NewRequestStore(filepath.Join(cfg.StateDir, "requests.json"))
-	}
-	path, err := file.DefaultPath()
-	if err != nil {
-		return nil
-	}
-	return file.NewRequestStore(path)
 }

@@ -17,7 +17,7 @@ import (
 )
 
 func newCallCommand(opts *options) *cobra.Command {
-	var data, saved string
+	var data string
 
 	cmd := &cobra.Command{
 		Use:   "call <rpc>",
@@ -32,13 +32,9 @@ func newCallCommand(opts *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if saved != "" && len(body) > 0 {
-				return fmt.Errorf("--saved and --data cannot be used together")
-			}
 			prepared, err := app.PrepareRequest.Execute(cmd.Context(), usecase.PrepareRequestInput{
-				RPCName:   args[0],
-				Data:      body,
-				SavedName: saved,
+				RPCName: args[0],
+				Data:    body,
 			})
 			if err != nil {
 				return opts.fail(cmd, err)
@@ -63,7 +59,6 @@ func newCallCommand(opts *options) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&data, "data", "d", "", "request JSON, '@file' to read a file, '-' for stdin")
-	cmd.Flags().StringVar(&saved, "saved", "", "name of a request saved in the REPL with \"save <name>\"")
 	return cmd
 }
 

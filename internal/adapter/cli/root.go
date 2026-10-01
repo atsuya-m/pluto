@@ -86,7 +86,6 @@ func newRootCommand(opts *options) *cobra.Command {
 	flags.BoolVar(&opts.cfg.JSONCodec, "json-codec", false, "use JSON instead of binary protobuf on the wire")
 	flags.StringArrayVarP(&opts.cfg.Headers, "header", "H", nil, "request header 'Key: Value' (repeatable)")
 	flags.StringVarP(&opts.output, "output", "o", "text", "output format: text, json")
-	flags.StringVar(&opts.cfg.StateDir, "state-dir", "", "directory for saved requests (default: user config dir/pluto)")
 	flags.StringVar(&opts.configPath, "config", "", "config file (default: .pluto.yaml in the current or a parent directory, then user config dir/pluto/config.yaml; env PLUTO_CONFIG)")
 	flags.StringVarP(&opts.profile, "profile", "p", "", "profile in the config file (env PLUTO_PROFILE)")
 	opts.flags = flags

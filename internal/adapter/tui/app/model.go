@@ -93,7 +93,6 @@ type Model struct {
 	sendSeq   int
 
 	headers http.Header
-	saved   []usecase.SavedRequestSummary
 
 	body      string
 	lastBody  string
@@ -132,7 +131,6 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		tea.Println(banner(m.deps)),
 		loadRPCs(m.ctx, m.deps.ListRPCs),
-		listSaved(m.ctx, m.deps.ListSaved),
 		m.command.Focus(),
 	)
 }

@@ -304,37 +304,6 @@ func TestCall(t *testing.T) {
 	})
 }
 
-func TestCall_SavedRequest(t *testing.T) {
-	srv := testserver.New(t)
-	state := t.TempDir()
-	store := `{"version":1,"last":{},"saved":{"taro":{"rpc":"user.v1.UserService.CreateUser","data":{"name":"Saved"},"saved_at":"2026-09-29T00:00:00Z"}}}`
-	if err := os.WriteFile(filepath.Join(state, "requests.json"), []byte(store), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	base := []string{"--schema", schemaDir, "--target", srv.URL, "--state-dir", state}
-
-	r := pluto(t, "", append(base, "call", "CreateUser", "--saved", "taro")...)
-	<-srv.Headers
-	if r.code != exitOK || !strings.Contains(r.stdout, `"Saved"`) {
-		t.Errorf("r = %+v", r)
-	}
-
-	r = pluto(t, "", append(base, "call", "CreateUser", "--saved", "nobody")...)
-	if r.code != exitError || !strings.Contains(r.stderr, `saved request "nobody" not found`) {
-		t.Errorf("r = %+v", r)
-	}
-
-	r = pluto(t, "", append(base, "call", "BanUser", "--saved", "taro")...)
-	if r.code != exitError || !strings.Contains(r.stderr, "is for user.v1.UserService.CreateUser") {
-		t.Errorf("r = %+v", r)
-	}
-
-	r = pluto(t, "", append(base, "call", "CreateUser", "--saved", "taro", "-d", "{}")...)
-	if r.code != exitUsage {
-		t.Errorf("r = %+v", r)
-	}
-}
-
 func TestProfiles(t *testing.T) {
 	srv := testserver.New(t)
 	dir := t.TempDir()

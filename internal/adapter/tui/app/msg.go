@@ -67,19 +67,6 @@ type streamSendFailedMsg struct {
 	Err error
 }
 
-type savedListedMsg struct {
-	Saved []usecase.SavedRequestSummary
-}
-
-type requestSavedMsg struct {
-	Name string
-	RPC  string
-}
-
-type requestDeletedMsg struct {
-	Name string
-}
-
 type copiedMsg struct {
 	Label  string
 	Length int

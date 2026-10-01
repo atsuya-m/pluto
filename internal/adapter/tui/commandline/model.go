@@ -48,7 +48,6 @@ type Model struct {
 
 	completer   Completer
 	headerKeys  []string
-	savedNames  []string
 	suggestions []Suggestion
 	selected    int
 	base        string
@@ -65,18 +64,13 @@ func New() Model {
 }
 
 func (m *Model) SetRPCs(rpcs []usecase.RPCSummary) {
-	m.completer = NewCompleter(rpcs).WithHeaderKeys(m.headerKeys).WithSavedNames(m.savedNames)
+	m.completer = NewCompleter(rpcs).WithHeaderKeys(m.headerKeys)
 	m.refresh()
 }
 
 func (m *Model) SetHeaderKeys(keys []string) {
 	m.headerKeys = keys
 	m.completer = m.completer.WithHeaderKeys(keys)
-}
-
-func (m *Model) SetSavedNames(names []string) {
-	m.savedNames = names
-	m.completer = m.completer.WithSavedNames(names)
 }
 
 func (m *Model) Focus() tea.Cmd {

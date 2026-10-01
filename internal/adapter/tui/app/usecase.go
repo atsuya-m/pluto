@@ -39,18 +39,6 @@ type OpenStreamUseCase interface {
 	Execute(context.Context, usecase.OpenStreamInput) (usecase.OpenStreamOutput, error)
 }
 
-type SaveRequestUseCase interface {
-	Execute(context.Context, usecase.SaveRequestInput) error
-}
-
-type ListSavedRequestsUseCase interface {
-	Execute(context.Context) ([]usecase.SavedRequestSummary, error)
-}
-
-type DeleteSavedRequestUseCase interface {
-	Execute(context.Context, string) error
-}
-
 type Dependencies struct {
 	ListServices    ListServicesUseCase
 	ListRPCs        ListRPCsUseCase
@@ -60,9 +48,6 @@ type Dependencies struct {
 	InvokeRPC       InvokeRPCUseCase
 	InvokeStream    InvokeServerStreamUseCase
 	OpenStream      OpenStreamUseCase
-	SaveRequest     SaveRequestUseCase
-	ListSaved       ListSavedRequestsUseCase
-	DeleteSaved     DeleteSavedRequestUseCase
 
 	Headers      http.Header
 	Target       string

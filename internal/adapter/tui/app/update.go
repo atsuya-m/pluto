@@ -68,24 +68,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case printMsg:
 		return m, tea.Println(msg.Text)
 
-	case requestDeletedMsg:
-		return m, tea.Sequence(tea.Println("deleted saved request "+msg.Name), listSaved(m.ctx, m.deps.ListSaved))
-
-	case savedListedMsg:
-		m.saved = msg.Saved
-		names := make([]string, 0, len(msg.Saved))
-		for _, s := range msg.Saved {
-			names = append(names, s.Name)
-		}
-		m.command.SetSavedNames(names)
-		return m, nil
-
-	case requestSavedMsg:
-		return m, tea.Sequence(
-			tea.Println(style.Success.Render("✔ saved")+" "+msg.Name+style.Subtle.Render(" ("+msg.RPC+") • `load "+msg.Name+"` to reopen")),
-			listSaved(m.ctx, m.deps.ListSaved),
-		)
-
 	case errMsg:
 		if m.mode == ModeRPCSelector {
 			m.mode = ModeCommand
@@ -97,7 +79,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.editor.SetSize(m.width, m.height)
 		m.hasEditor = true
 		m.mode = ModeRequestEditor
-		return m, restoredNotice(msg.Output)
+		return m, nil
 
 	case invokedMsg:
 		m.cancel = nil
@@ -262,35 +244,6 @@ func (m Model) execute(input string) (tea.Model, tea.Cmd) {
 		m.headers = next
 		m.command.SetHeaderKeys(headerKeys(next))
 		return m, tea.Sequence(echo, tea.Println(style.Subtle.Render(note)))
-	case "new":
-		if len(c.Args) != 1 {
-			return m, tea.Sequence(echo, tea.Println(style.Error.Render("usage: new <rpc>")))
-		}
-		return m, tea.Sequence(echo, prepareWith(m.ctx, m.deps.PrepareRequest, usecase.PrepareRequestInput{RPCName: c.Args[0]}))
-	case "save":
-		if len(c.Args) != 1 {
-			return m, tea.Sequence(echo, tea.Println(style.Error.Render("usage: save <name>")))
-		}
-		if !m.hasEditor {
-			return m, tea.Sequence(echo, tea.Println(style.Error.Render("✘ no request to save yet (open one with `call <rpc>`)")))
-		}
-		return m, tea.Sequence(echo, saveRequest(m.ctx, m.deps.SaveRequest, usecase.SaveRequestInput{
-			RPCName: m.editor.RPC().FullName,
-			Name:    c.Args[0],
-			Message: m.editor.Builder().Message(),
-		}))
-	case "load":
-		if len(c.Args) != 1 {
-			return m, tea.Sequence(echo, tea.Println(style.Error.Render("usage: load <name>")))
-		}
-		return m, tea.Sequence(echo, prepareWith(m.ctx, m.deps.PrepareRequest, usecase.PrepareRequestInput{SavedName: c.Args[0]}))
-	case "saved":
-		return m, tea.Sequence(echo, tea.Println(formatSaved(m.saved)))
-	case "unsave":
-		if len(c.Args) != 1 {
-			return m, tea.Sequence(echo, tea.Println(style.Error.Render("usage: unsave <name>")))
-		}
-		return m, tea.Sequence(echo, deleteSaved(m.ctx, m.deps.DeleteSaved, c.Args[0]))
 	case "desc", "describe":
 		switch {
 		case len(c.Args) == 1:
@@ -406,7 +359,6 @@ func (m Model) beginStream(pending []proto.Message, finish bool) (tea.Model, tea
 	return m, tea.Batch(
 		tea.Println(style.Subtle.Render("⇄ "+rpc.FullName+" stream opened")),
 		m.spinner.Tick,
-		saveRequest(m.ctx, m.deps.SaveRequest, usecase.SaveRequestInput{RPCName: rpc.FullName, Message: pending[0]}),
 		openStream(ctx, m.deps.OpenStream, usecase.OpenStreamInput{RPCName: rpc.FullName, Headers: m.headers}, pending, finish),
 	)
 }
@@ -416,10 +368,7 @@ func (m Model) startInvoke() (tea.Model, tea.Cmd) {
 	m.cancel = cancel
 	rpc := m.editor.RPC()
 	reqJSON, _ := textpresenter.ProtoJSON(m.editor.Builder().Message())
-	echo := tea.Batch(
-		tea.Println(style.Subtle.Render("→ "+rpc.FullName)+"\n"+style.Subtle.Render(reqJSON)),
-		saveRequest(m.ctx, m.deps.SaveRequest, usecase.SaveRequestInput{RPCName: rpc.FullName, Message: m.editor.Builder().Message()}),
-	)
+	echo := tea.Println(style.Subtle.Render("→ "+rpc.FullName) + "\n" + style.Subtle.Render(reqJSON))
 
 	if rpc.ServerStreaming {
 		m.mode = ModeStreaming

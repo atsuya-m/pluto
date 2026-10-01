@@ -14,7 +14,6 @@ type Config struct {
 	Protocol    string
 	JSONCodec   bool
 	Headers     []string
-	StateDir    string
 
 	Profile        string
 	ProfileHeaders map[string]string

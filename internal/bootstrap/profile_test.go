@@ -98,7 +98,6 @@ profiles:
     protocol: grpc
     reflection: false
     json_codec: true
-    state_dir: state
     headers:
       x-api-key: ${API_KEY}
       User-Agent: my-client/1.0.0
@@ -128,9 +127,6 @@ profiles:
 	}
 	if p.Target != "https://api.example.com" || p.Protocol != "grpc" || *p.JSONCodec != true || *p.Reflection {
 		t.Errorf("profile = %+v", p)
-	}
-	if p.StateDir != filepath.Join(base, "state") {
-		t.Errorf("state dir = %q", p.StateDir)
 	}
 	if p.Headers["x-api-key"] != "k" || p.Headers["User-Agent"] != "my-client/1.0.0" {
 		t.Errorf("headers = %v", p.Headers)
@@ -162,13 +158,12 @@ func TestWithProfilePrecedence(t *testing.T) {
 		Target:      "https://dev",
 		Protocol:    "grpc",
 		JSONCodec:   &no,
-		StateDir:    "/state",
 		Headers:     map[string]string{"X-A": "1"},
 	}
 	base := Config{SchemaPaths: []string{"."}, Target: "http://localhost:8080", Protocol: "connect"}
 
 	c := base.WithProfile(p, func(string) bool { return false })
-	if c.Profile != "dev" || c.Target != "https://dev" || c.Protocol != "grpc" || !c.Reflection || c.SchemaPaths[0] != "/p/api.proto" || c.StateDir != "/state" {
+	if c.Profile != "dev" || c.Target != "https://dev" || c.Protocol != "grpc" || !c.Reflection || c.SchemaPaths[0] != "/p/api.proto" {
 		t.Errorf("profile not applied: %+v", c)
 	}
 

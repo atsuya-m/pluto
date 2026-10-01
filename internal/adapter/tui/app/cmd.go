@@ -26,12 +26,8 @@ func loadRPCs(ctx context.Context, uc ListRPCsUseCase) tea.Cmd {
 }
 
 func prepare(ctx context.Context, uc PrepareRequestUseCase, name string) tea.Cmd {
-	return prepareWith(ctx, uc, usecase.PrepareRequestInput{RPCName: name, RestoreLast: true})
-}
-
-func prepareWith(ctx context.Context, uc PrepareRequestUseCase, input usecase.PrepareRequestInput) tea.Cmd {
 	return func() tea.Msg {
-		out, err := uc.Execute(ctx, input)
+		out, err := uc.Execute(ctx, usecase.PrepareRequestInput{RPCName: name})
 		if err != nil {
 			return errMsg{Err: err}
 		}
@@ -41,7 +37,7 @@ func prepareWith(ctx context.Context, uc PrepareRequestUseCase, input usecase.Pr
 
 func prepareImplicit(ctx context.Context, uc PrepareRequestUseCase, name string) tea.Cmd {
 	return func() tea.Msg {
-		out, err := uc.Execute(ctx, usecase.PrepareRequestInput{RPCName: name, RestoreLast: true})
+		out, err := uc.Execute(ctx, usecase.PrepareRequestInput{RPCName: name})
 		if errors.Is(err, schema.ErrSymbolNotFound) {
 			return errMsg{Err: fmt.Errorf("unknown command or rpc %q (try `help`)", name)}
 		}
@@ -132,43 +128,6 @@ func closeSend(session *usecase.StreamSession) tea.Cmd {
 			return streamSendFailedMsg{Err: err}
 		}
 		return nil
-	}
-}
-
-func listSaved(ctx context.Context, uc ListSavedRequestsUseCase) tea.Cmd {
-	if uc == nil {
-		return nil
-	}
-	return func() tea.Msg {
-		saved, err := uc.Execute(ctx)
-		if err != nil {
-			return errMsg{Err: err}
-		}
-		return savedListedMsg{Saved: saved}
-	}
-}
-
-func saveRequest(ctx context.Context, uc SaveRequestUseCase, input usecase.SaveRequestInput) tea.Cmd {
-	if uc == nil {
-		return nil
-	}
-	return func() tea.Msg {
-		if err := uc.Execute(ctx, input); err != nil {
-			return errMsg{Err: err}
-		}
-		if input.Name == "" {
-			return nil
-		}
-		return requestSavedMsg{Name: input.Name, RPC: input.RPCName}
-	}
-}
-
-func deleteSaved(ctx context.Context, uc DeleteSavedRequestUseCase, name string) tea.Cmd {
-	return func() tea.Msg {
-		if err := uc.Execute(ctx, name); err != nil {
-			return errMsg{Err: err}
-		}
-		return requestDeletedMsg{Name: name}
 	}
 }
 

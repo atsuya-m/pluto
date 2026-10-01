@@ -24,7 +24,6 @@ type Profile struct {
 	Protocol    string
 	JSONCodec   *bool
 	Headers     map[string]string
-	StateDir    string
 }
 
 type ConfigFile struct {
@@ -60,7 +59,6 @@ type profileYAML struct {
 	Protocol    string            `yaml:"protocol"`
 	JSONCodec   *bool             `yaml:"json_codec"`
 	Headers     map[string]string `yaml:"headers"`
-	StateDir    string            `yaml:"state_dir"`
 }
 
 type fileYAML struct {
@@ -138,7 +136,6 @@ func (c *ConfigFile) Summary(name string) (Profile, bool) {
 		Protocol:    raw.Protocol,
 		JSONCodec:   raw.JSONCodec,
 		Headers:     raw.Headers,
-		StateDir:    raw.StateDir,
 	}, true
 }
 
@@ -154,7 +151,6 @@ func (c *ConfigFile) Profile(name string, lookup func(string) (string, bool)) (P
 		JSONCodec:  raw.JSONCodec,
 		Target:     e.value(raw.Target),
 		Protocol:   e.value(raw.Protocol),
-		StateDir:   e.path(raw.StateDir),
 	}
 	for _, s := range raw.Schema {
 		p.Schema = append(p.Schema, e.path(s))
@@ -237,9 +233,6 @@ func (c Config) WithProfile(p Profile, changed func(flag string) bool) Config {
 	}
 	if !changed("json-codec") && p.JSONCodec != nil {
 		c.JSONCodec = *p.JSONCodec
-	}
-	if !changed("state-dir") && p.StateDir != "" {
-		c.StateDir = p.StateDir
 	}
 	c.ProfileHeaders = p.Headers
 	return c

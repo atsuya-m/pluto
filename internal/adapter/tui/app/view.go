@@ -3,9 +3,6 @@ package app
 import (
 	"fmt"
 	"strings"
-	"time"
-
-	tea "github.com/charmbracelet/bubbletea"
 
 	"google.golang.org/protobuf/proto"
 
@@ -18,12 +15,7 @@ import (
 const helpText = `commands:
   <rpc>                   same as ` + "`call <rpc>`" + `
   rpcs [service]          select an rpc interactively (or list rpcs of a service)
-  call [rpc]              open the request editor (restores the last request sent to it)
-  new <rpc>               open the request editor with an empty request
-  save <name>             save the current request under a name
-  load <name>             open a saved request
-  saved                   list saved requests
-  unsave <name>           delete a saved request
+  call [rpc]              open the request editor for an rpc
   header                  show request headers (sensitive values are masked)
   header set|add <K> <V>  set or add a request header
   header rm <K> | clear   remove one header or all of them
@@ -169,51 +161,6 @@ func renderStreamSummary(r result) string {
 		label = style.Success.Render("■ stopped")
 	}
 	return fmt.Sprintf("%s %s %s", label, r.rpc, style.Subtle.Render(fmt.Sprintf("(%s, %s)", streamCounts(r), r.duration)))
-}
-
-func restoredNotice(out usecase.PrepareRequestOutput) tea.Cmd {
-	switch {
-	case out.RestoreWarning != "":
-		return tea.Println(style.Error.Render("⚠ " + out.RestoreWarning))
-	case out.RestoredFrom == "last":
-		return tea.Println(style.Subtle.Render(fmt.Sprintf("↺ restored the last request to %s (%s) • `new %s` for an empty one", out.RPC.Name, ago(out.RestoredAt), out.RPC.Name)))
-	case out.RestoredFrom != "":
-		return tea.Println(style.Subtle.Render(fmt.Sprintf("↺ loaded %q (%s)", out.RestoredFrom, ago(out.RestoredAt))))
-	default:
-		return nil
-	}
-}
-
-func ago(t time.Time) string {
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	default:
-		return t.Local().Format("2006-01-02")
-	}
-}
-
-func formatSaved(saved []usecase.SavedRequestSummary) string {
-	if len(saved) == 0 {
-		return "no saved requests (use `save <name>` while editing a request)"
-	}
-	nameW := 0
-	for _, s := range saved {
-		nameW = max(nameW, len(s.Name))
-	}
-	var b strings.Builder
-	for i, s := range saved {
-		if i > 0 {
-			b.WriteString("\n")
-		}
-		fmt.Fprintf(&b, "%-*s  %s  %s", nameW, s.Name, s.RPC, style.Subtle.Render(ago(s.SavedAt)))
-	}
-	return b.String()
 }
 
 func renderError(title string, d errdetail.ErrorDetail) string {

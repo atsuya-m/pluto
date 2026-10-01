@@ -103,8 +103,7 @@ AltScreen は使わず、コマンドの結果・送信した request・response
 | コマンド | 内容 |
 |---|---|
 | `<rpc>` | `call <rpc>` と同じ |
-| `call [rpc]` | request editor を開く。前回その RPC に送った request があれば復元する。引数なしなら RPC 一覧から選ぶ |
-| `new <rpc>` | 空の request で request editor を開く |
+| `call [rpc]` | request editor を開く。引数なしなら RPC 一覧から選ぶ |
 | `rpcs [service]` | RPC を一覧から選ぶ（`/` で絞り込み）。service を指定するとその RPC を一覧表示する |
 | `desc [rpc\|message] <name>` | RPC / message の定義を表示する |
 | `services` | service の一覧 |
@@ -112,9 +111,6 @@ AltScreen は使わず、コマンドの結果・送信した request・response
 | `header` | 現在の request header を表示する（機微な値は伏せ字） |
 | `header set\|add <Key> <value>` | request header を設定 / 追加する。以降のすべての呼び出しに付く |
 | `header rm <Key>` / `header clear` | request header を削除する |
-| `save <name>` | 今の request を名前を付けて保存する |
-| `load <name>` | 保存した request を開く |
-| `saved` / `unsave <name>` | 保存した request の一覧 / 削除 |
 | `reload` | RPC 一覧を読み直す（補完用） |
 | `clear` / `help` / `exit` | 画面クリア / ヘルプ / 終了（`C-d`、`C-c` でも終了） |
 
@@ -122,7 +118,7 @@ RPC 名は `CreateUser`、`UserService.CreateUser`、`user.v1.UserService.Create
 
 ### 入力と補完
 
-- 入力中は補完候補がポップアップする。先頭では コマンドと RPC、`call ` の後では RPC、`rpcs ` の後では service、`load ` の後では保存名、`header rm ` の後では header 名が候補になる
+- 入力中は補完候補がポップアップする。先頭では コマンドと RPC、`call ` の後では RPC、`rpcs ` の後では service、`header rm ` の後では header 名が候補になる
 - `tab` / `shift+tab` で候補を選ぶ。候補が1つなら `tab` で確定する。`esc` / `C-g` でポップアップを閉じる
 - 候補を選んでいないときの `↑` / `↓` / `C-p` / `C-n` は履歴移動
 - 入力欄は emacs キーバインド（`C-a` `C-e` `C-b` `C-f` `C-k` `C-u` `C-w` `C-d` `M-b` `M-f` `M-d`）で編集できる
@@ -210,11 +206,6 @@ CreateUser  ›  CreateUserRequest
 - **server streaming**: 通常どおり送信すると、受信したメッセージが `← #n` として届いた順に流れる。`esc` / `C-g` で受信を止める
 - **client streaming / bidi streaming**: request editor で `C-s` を押すたびに今のメッセージを送る（`→ #n`）。最初の `C-s` でストリームが開き、bidi では返ってきたメッセージがその場で流れる。`C-x` で送信を終了し、最上位で `esc` を押すとストリームをキャンセルする
 
-### 保存した request
-
-送信した request は RPC ごとに自動で保存され、次に `call <rpc>` したときに復元される。名前を付けて保存したものは CLI からも `call --saved <name>` で使える。
-
-保存先は `<ユーザー設定ディレクトリ>/pluto/requests.json`（macOS では `~/Library/Application Support/pluto/requests.json`）で、`--state-dir` で変更できる。ファイルは `0600`、ディレクトリは `0700` で作成する。保存されるのは request の本文のみで、header は保存しない。
 
 ## CLI（AI / script 向け）
 
@@ -225,7 +216,7 @@ pluto desc services
 pluto desc rpcs [service]
 pluto desc rpc <name>
 pluto desc message <name>
-pluto call <rpc> [-d <json>] [--saved <name>]
+pluto call <rpc> [-d <json>]
 ```
 
 ### 例
@@ -340,7 +331,7 @@ pluto profiles                  # プロファイル一覧 (ヘッダーは名�
 
 - 設定ファイルは `--config` (または `PLUTO_CONFIG`) → カレントディレクトリから親をたどって最初に見つかった `.pluto.yaml` → `<ユーザー設定ディレクトリ>/pluto/config.yaml` の順に探す
 - プロファイルは `-p` → `PLUTO_PROFILE` → `default_profile` の順に決まる
-- 使えるキー: `schema` / `import_paths` / `reflection` / `target` / `protocol` / `json_codec` / `headers` / `state_dir`。未知のキーはエラーになる
+- 使えるキー: `schema` / `import_paths` / `reflection` / `target` / `protocol` / `json_codec` / `headers`。未知のキーはエラーになる
 - 値の中の `${VAR}` / `$VAR` は環境変数で展開する。参照した環境変数が未設定または空ならエラーにする（空の認証ヘッダーを送らないため）
 - パスの `~` はホームディレクトリ、相対パスは設定ファイルのあるディレクトリからの相対として扱う
 - コマンドラインで明示したフラグはプロファイルより優先する。`-H` で同じ名前のヘッダーを渡すとプロファイルの値を置き換える
@@ -378,7 +369,6 @@ pluto profiles                  # プロファイル一覧 (ヘッダーは名�
 | `--json-codec` | `false` | wire format を JSON にする |
 | `-H, --header` | | `'Key: Value'` 形式の request header（複数指定可） |
 | `-o, --output` | `text` | `text` / `json` |
-| `--state-dir` | ユーザー設定ディレクトリ/pluto | 保存した request の置き場所 |
 | `--config` | 自動で探索 | 設定ファイル（`PLUTO_CONFIG`） |
 | `-p, --profile` | `default_profile` | 使うプロファイル（`PLUTO_PROFILE`） |
 
@@ -404,7 +394,7 @@ internal/
     schema/                   Schema / RPC / Message / Field と名前解決
     request/                  DynamicMessageBuilder (request の組み立て), FieldPath
   application/
-    port/                     SchemaLoader / RPCInvoker / StreamOpener / RequestStore など
+    port/                     SchemaLoader / RPCInvoker / StreamOpener など
     usecase/                  ListRPCs / DescribeRPC / PrepareRequest / InvokeRPC / OpenStream など
   adapter/
     cli/                      cobra による Plain CLI と repl コマンド
@@ -413,7 +403,6 @@ internal/
   infrastructure/
     schema/                   proto (protocompile) / reflection / キャッシュ
     transport/                connect-go による Connect / gRPC / gRPC-Web
-    store/                    保存した request のファイルストア
   bootstrap/                  依存の組み立て (手動 DI)
   testutil/                   テスト用の fixture / テストサーバー
 examples/userserver           サンプルサーバー

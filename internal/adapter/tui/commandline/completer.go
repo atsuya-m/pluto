@@ -19,11 +19,6 @@ var commandSuggestions = []Suggestion{
 	{Text: "rpcs", Description: "select an rpc (or list rpcs of a service)"},
 	{Text: "services", Description: "list services"},
 	{Text: "edit", Description: "reopen the last request"},
-	{Text: "new", Description: "open an empty request for an rpc"},
-	{Text: "save", Description: "save the current request under a name"},
-	{Text: "load", Description: "open a saved request"},
-	{Text: "saved", Description: "list saved requests"},
-	{Text: "unsave", Description: "delete a saved request"},
 	{Text: "header", Description: "show or change request headers"},
 	{Text: "reload", Description: "reload the rpc list"},
 	{Text: "clear", Description: "clear the screen"},
@@ -35,21 +30,12 @@ type Completer struct {
 	rpcs     []Suggestion
 	services []Suggestion
 	headers  []Suggestion
-	saved    []Suggestion
 }
 
 func (c Completer) WithHeaderKeys(keys []string) Completer {
 	c.headers = nil
 	for _, k := range keys {
 		c.headers = append(c.headers, Suggestion{Text: k, Description: "request header"})
-	}
-	return c
-}
-
-func (c Completer) WithSavedNames(names []string) Completer {
-	c.saved = nil
-	for _, n := range names {
-		c.saved = append(c.saved, Suggestion{Text: n, Description: "saved request"})
 	}
 	return c
 }
@@ -119,7 +105,7 @@ func (c Completer) Complete(input string) (string, []Suggestion) {
 	switch {
 	case len(words) == 0:
 		pool = append(append(pool, commandSuggestions...), c.rpcs...)
-	case len(words) == 1 && isOneOf(words[0], "call", "new"):
+	case len(words) == 1 && isOneOf(words[0], "call"):
 		pool = c.rpcs
 	case len(words) == 1 && isOneOf(words[0], "desc", "describe"):
 		pool = append([]Suggestion{
@@ -130,8 +116,6 @@ func (c Completer) Complete(input string) (string, []Suggestion) {
 		pool = c.rpcs
 	case len(words) == 1 && isOneOf(words[0], "rpcs", "ls"):
 		pool = c.services
-	case len(words) == 1 && isOneOf(words[0], "load", "unsave"):
-		pool = c.saved
 	case len(words) == 1 && isOneOf(words[0], "header", "headers"):
 		pool = []Suggestion{
 			{Text: "set", Description: "set a header (replaces existing values)"},

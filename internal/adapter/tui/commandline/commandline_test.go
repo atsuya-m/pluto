@@ -88,8 +88,8 @@ func TestCompleter(t *testing.T) {
 	}
 }
 
-func TestCompleter_HeadersAndSaved(t *testing.T) {
-	c := NewCompleter(testRPCs()).WithHeaderKeys([]string{"Authorization", "X-Trace"}).WithSavedNames([]string{"alice", "bob"})
+func TestCompleter_Headers(t *testing.T) {
+	c := NewCompleter(testRPCs()).WithHeaderKeys([]string{"Authorization", "X-Trace"})
 	tests := []struct {
 		input string
 		want  []string
@@ -97,10 +97,8 @@ func TestCompleter_HeadersAndSaved(t *testing.T) {
 		{"header ", []string{"set", "add", "rm", "clear"}},
 		{"header rm ", []string{"Authorization", "X-Trace"}},
 		{"header set x", []string{"X-Trace"}},
-		{"load ", []string{"alice", "bob"}},
-		{"unsave b", []string{"bob"}},
-		{"new Cre", []string{"CreateUser"}},
-		{"sa", []string{"save", "saved", "unsave"}},
+		{"load ", nil},
+		{"he", []string{"header", "help"}},
 	}
 	for _, tt := range tests {
 		if _, got := c.Complete(tt.input); !slices.Equal(texts(got), tt.want) {

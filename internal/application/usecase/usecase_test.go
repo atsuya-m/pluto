@@ -17,12 +17,10 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 
 	"github.com/atsuya-m/pluto/internal/application/invocation"
-	"github.com/atsuya-m/pluto/internal/application/port"
 	"github.com/atsuya-m/pluto/internal/application/usecase"
 	"github.com/atsuya-m/pluto/internal/domain/schema"
 	jsondecoder "github.com/atsuya-m/pluto/internal/infrastructure/codec/protojson"
 	"github.com/atsuya-m/pluto/internal/testutil/fixture"
-	"github.com/atsuya-m/pluto/internal/testutil/memstore"
 )
 
 type fakeInvoker struct {
@@ -335,119 +333,6 @@ func TestInvokeServerStream(t *testing.T) {
 		_, err := usecase.NewInvokeServerStream(fixture.NewSchemaLoader(t), inv).Execute(ctx, usecase.InvokeServerStreamInput{RPCName: "WatchUsers", Message: user})
 		if err == nil || inv.calls != 0 {
 			t.Errorf("err = %v, calls = %d", err, inv.calls)
-		}
-	})
-}
-
-func TestPrepareRequest_RestoreAndSaved(t *testing.T) {
-	ctx := context.Background()
-	store := memstore.New()
-	loader := fixture.NewSchemaLoader(t)
-	prepare := usecase.NewPrepareRequest(loader, jsondecoder.NewRequestDecoder(), usecase.WithRequestStore(store))
-	save := usecase.NewSaveRequest(store)
-
-	msg := dynamicpb.NewMessage(fixture.Message(t, "user.v1.CreateUserRequest"))
-	if err := protojson.Unmarshal([]byte(`{"name":"Last"}`), msg); err != nil {
-		t.Fatal(err)
-	}
-
-	t.Run("nothing to restore", func(t *testing.T) {
-		out, err := prepare.Execute(ctx, usecase.PrepareRequestInput{RPCName: "CreateUser", RestoreLast: true})
-		if err != nil || out.RestoredFrom != "" || marshal(t, out.Builder.Message()) != "{}" {
-			t.Errorf("out = %+v, err = %v", out.RestoredFrom, err)
-		}
-	})
-
-	if err := save.Execute(ctx, usecase.SaveRequestInput{RPCName: "user.v1.UserService.CreateUser", Message: msg}); err != nil {
-		t.Fatal(err)
-	}
-
-	t.Run("restore last", func(t *testing.T) {
-		out, err := prepare.Execute(ctx, usecase.PrepareRequestInput{RPCName: "CreateUser", RestoreLast: true})
-		if err != nil || out.RestoredFrom != "last" || marshal(t, out.Builder.Message()) != `{"name":"Last"}` || out.RestoredAt.IsZero() {
-			t.Errorf("out = %+v, err = %v", out.RestoredFrom, err)
-		}
-	})
-
-	t.Run("without RestoreLast", func(t *testing.T) {
-		out, _ := prepare.Execute(ctx, usecase.PrepareRequestInput{RPCName: "CreateUser"})
-		if out.RestoredFrom != "" || marshal(t, out.Builder.Message()) != "{}" {
-			t.Errorf("out = %+v", out.RestoredFrom)
-		}
-	})
-
-	t.Run("explicit data wins over last", func(t *testing.T) {
-		out, _ := prepare.Execute(ctx, usecase.PrepareRequestInput{RPCName: "CreateUser", RestoreLast: true, Data: []byte(`{"name":"Data"}`)})
-		if out.RestoredFrom != "" || marshal(t, out.Builder.Message()) != `{"name":"Data"}` {
-			t.Errorf("out = %+v", out.RestoredFrom)
-		}
-	})
-
-	t.Run("stale last request is a warning", func(t *testing.T) {
-		_ = store.SaveLast(ctx, port.StoredRequest{RPC: "user.v1.UserService.GetUser", Data: []byte(`{"removedField":1}`)})
-		out, err := prepare.Execute(ctx, usecase.PrepareRequestInput{RPCName: "UserService.GetUser", RestoreLast: true})
-		if err != nil || out.RestoreWarning == "" || out.RestoredFrom != "" {
-			t.Errorf("warning = %q, err = %v", out.RestoreWarning, err)
-		}
-	})
-
-	if err := save.Execute(ctx, usecase.SaveRequestInput{RPCName: "user.v1.UserService.CreateUser", Name: "taro", Message: msg}); err != nil {
-		t.Fatal(err)
-	}
-
-	t.Run("load named without rpc", func(t *testing.T) {
-		out, err := prepare.Execute(ctx, usecase.PrepareRequestInput{SavedName: "taro"})
-		if err != nil || out.RPC.FullName != "user.v1.UserService.CreateUser" || out.RestoredFrom != "taro" {
-			t.Errorf("out = %+v, err = %v", out.RPC, err)
-		}
-	})
-
-	t.Run("named request for another rpc", func(t *testing.T) {
-		if _, err := prepare.Execute(ctx, usecase.PrepareRequestInput{SavedName: "taro", RPCName: "BanUser"}); err == nil {
-			t.Error("expected mismatch error")
-		}
-	})
-
-	t.Run("unknown name", func(t *testing.T) {
-		if _, err := prepare.Execute(ctx, usecase.PrepareRequestInput{SavedName: "nobody"}); err == nil {
-			t.Error("expected not found error")
-		}
-	})
-
-	t.Run("list and delete", func(t *testing.T) {
-		list, err := usecase.NewListSavedRequests(store).Execute(ctx)
-		if err != nil || len(list) != 1 || list[0].Name != "taro" || list[0].RPC != "user.v1.UserService.CreateUser" {
-			t.Fatalf("list = %+v, err = %v", list, err)
-		}
-		if err := usecase.NewDeleteSavedRequest(store).Execute(ctx, "taro"); err != nil {
-			t.Fatal(err)
-		}
-		if err := usecase.NewDeleteSavedRequest(store).Execute(ctx, "taro"); err == nil {
-			t.Error("deleting twice should fail")
-		}
-	})
-
-	t.Run("invalid names", func(t *testing.T) {
-		for _, name := range []string{"has space", "../escape", "-dash-first"} {
-			if err := save.Execute(ctx, usecase.SaveRequestInput{RPCName: "x", Name: name, Message: msg}); err == nil {
-				t.Errorf("name %q should be rejected", name)
-			}
-		}
-	})
-
-	t.Run("without store", func(t *testing.T) {
-		if err := usecase.NewSaveRequest(nil).Execute(ctx, usecase.SaveRequestInput{Message: msg}); !errors.Is(err, usecase.ErrNoRequestStore) {
-			t.Errorf("err = %v", err)
-		}
-		if list, err := usecase.NewListSavedRequests(nil).Execute(ctx); err != nil || list != nil {
-			t.Errorf("list = %v, err = %v", list, err)
-		}
-		plain := usecase.NewPrepareRequest(loader, jsondecoder.NewRequestDecoder())
-		if _, err := plain.Execute(ctx, usecase.PrepareRequestInput{SavedName: "taro"}); !errors.Is(err, usecase.ErrNoRequestStore) {
-			t.Errorf("err = %v", err)
-		}
-		if out, err := plain.Execute(ctx, usecase.PrepareRequestInput{RPCName: "CreateUser", RestoreLast: true}); err != nil || out.RestoredFrom != "" {
-			t.Errorf("out = %+v, err = %v", out.RestoredFrom, err)
 		}
 	})
 }

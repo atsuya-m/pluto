@@ -23,7 +23,6 @@ import (
 	"github.com/atsuya-m/pluto/internal/domain/request"
 	jsondecoder "github.com/atsuya-m/pluto/internal/infrastructure/codec/protojson"
 	"github.com/atsuya-m/pluto/internal/testutil/fixture"
-	"github.com/atsuya-m/pluto/internal/testutil/memstore"
 )
 
 type fakeInvokeRPC struct {
@@ -51,7 +50,6 @@ type harness struct {
 	printed   []string
 	invoke    *fakeInvokeRPC
 	late      chan tea.Msg
-	store     *memstore.Store
 	opener    *chanOpener
 	clipboard []string
 }
@@ -60,24 +58,20 @@ func newHarness(t *testing.T, invoke func(context.Context, usecase.InvokeRPCInpu
 	t.Helper()
 	loader := fixture.NewSchemaLoader(t)
 	fake := &fakeInvokeRPC{executeFn: invoke}
-	store := memstore.New()
 	opener := &chanOpener{t: t}
 	m := NewModel(context.Background(), Dependencies{
 		ListServices:    usecase.NewListServices(loader),
 		ListRPCs:        usecase.NewListRPCs(loader),
 		DescribeRPC:     usecase.NewDescribeRPC(loader),
 		DescribeMessage: usecase.NewDescribeMessage(loader),
-		PrepareRequest:  usecase.NewPrepareRequest(loader, jsondecoder.NewRequestDecoder(), usecase.WithRequestStore(store)),
+		PrepareRequest:  usecase.NewPrepareRequest(loader, jsondecoder.NewRequestDecoder()),
 		InvokeRPC:       fake,
 		OpenStream:      usecase.NewOpenStream(loader, opener),
-		SaveRequest:     usecase.NewSaveRequest(store),
-		ListSaved:       usecase.NewListSavedRequests(store),
-		DeleteSaved:     usecase.NewDeleteSavedRequest(store),
 		Headers:         http.Header{"X-Initial": {"1"}},
 		Target:          "http://test",
 		Protocol:        "connect",
 	})
-	h := &harness{t: t, model: m, invoke: fake, late: make(chan tea.Msg, 64), store: store, opener: opener}
+	h := &harness{t: t, model: m, invoke: fake, late: make(chan tea.Msg, 64), opener: opener}
 	h.model = withClipboard(h.app(), func(text string) (string, error) {
 		h.clipboard = append(h.clipboard, text)
 		return "fake", nil
@@ -691,57 +685,6 @@ func TestApp_HeaderCommands(t *testing.T) {
 	h.submit("header bogus")
 	if !strings.Contains(h.output(), "usage: header") {
 		t.Errorf("usage error missing:\n%s", h.output())
-	}
-}
-
-func TestApp_SaveLoadAndRestore(t *testing.T) {
-	h := newHarness(t, okResponse(t))
-	h.submit("save x")
-	if !strings.Contains(h.output(), "no request to save yet") {
-		t.Errorf("output:\n%s", h.output())
-	}
-
-	h.submit("CreateUser")
-	h.setField("name", "Taro")
-	h.key(tea.KeyCtrlS)
-	h.key(tea.KeyEnter)
-	h.typeText("q")
-	if _, ok, _ := h.store.LoadLast(context.Background(), "user.v1.UserService.CreateUser"); !ok {
-		t.Fatal("sending should remember the last request")
-	}
-
-	h.submit("CreateUser")
-	if !strings.Contains(h.output(), "restored the last request") || !h.app().editor.Builder().Has(request.Path("name")) {
-		t.Fatalf("last request was not restored:\n%s", h.output())
-	}
-	h.key(tea.KeyEsc)
-
-	h.submit("new CreateUser")
-	if h.app().editor.Builder().Has(request.Path("name")) {
-		t.Error("new should open an empty request")
-	}
-	h.setField("name", "Named")
-	h.key(tea.KeyEsc)
-	h.submit("save mine")
-	h.submit("saved")
-	if !strings.Contains(h.output(), "✔ saved") || !strings.Contains(h.output(), "mine  user.v1.UserService.CreateUser") {
-		t.Errorf("output:\n%s", h.output())
-	}
-
-	h.submit("load mine")
-	if h.app().Mode() != ModeRequestEditor || !strings.Contains(h.output(), `loaded "mine"`) {
-		t.Fatalf("mode = %v, output:\n%s", h.app().Mode(), h.output())
-	}
-	v, _ := h.app().editor.Builder().Get(request.Path("name"))
-	if v.String() != "Named" {
-		t.Errorf("loaded name = %q", v.String())
-	}
-	h.key(tea.KeyEsc)
-
-	h.submit("unsave mine")
-	h.submit("load mine")
-	if !strings.Contains(h.output(), "deleted saved request mine") || !strings.Contains(h.output(), `saved request "mine" not found`) {
-		t.Errorf("output:\n%s", h.output())
 	}
 }
 
