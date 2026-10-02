@@ -45,7 +45,7 @@ func New(cfg Config) (*Application, error) {
 		source = reflection.NewSchemaLoader(client)
 	}
 	loader := cached.NewSchemaLoader(source)
-	invoker, err := connect.NewInvoker(cfg.Target, connect.WithProtocol(protocol), connect.WithJSON(cfg.JSONCodec))
+	invoker, err := connect.NewInvoker(cfg.Target, connect.WithProtocol(protocol), connect.WithJSON(cfg.JSONCodec), connect.WithTimeout(cfg.Timeout))
 	if err != nil {
 		return nil, err
 	}

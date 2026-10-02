@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 func writeFile(t *testing.T, path, content string) {
@@ -98,6 +99,7 @@ profiles:
     protocol: grpc
     reflection: false
     json_codec: true
+    timeout: 30s
     headers:
       x-api-key: ${API_KEY}
       User-Agent: my-client/1.0.0
@@ -128,6 +130,9 @@ profiles:
 	if p.Target != "https://api.example.com" || p.Protocol != "grpc" || *p.JSONCodec != true || *p.Reflection {
 		t.Errorf("profile = %+v", p)
 	}
+	if p.Timeout == nil || *p.Timeout != 30*time.Second {
+		t.Errorf("timeout = %v", p.Timeout)
+	}
 	if p.Headers["x-api-key"] != "k" || p.Headers["User-Agent"] != "my-client/1.0.0" {
 		t.Errorf("headers = %v", p.Headers)
 	}
@@ -143,6 +148,23 @@ profiles:
 		t.Errorf("unknown profile error = %v", err)
 	}
 
+	writeFile(t, path, "profiles:\n  dev:\n    timeout: soon\n")
+	f, err = LoadConfigFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Profile("dev", env(vars)); err == nil || !strings.Contains(err.Error(), "timeout") {
+		t.Errorf("invalid timeout error = %v", err)
+	}
+}
+
+func TestProfileSummaryDoesNotExpand(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ".pluto.yaml")
+	writeFile(t, path, "profiles:\n  dev:\n    headers:\n      x-api-key: ${API_KEY}\n")
+	f, err := LoadConfigFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if s, ok := f.Summary("dev"); !ok || s.Headers["x-api-key"] != "${API_KEY}" {
 		t.Errorf("summary should not expand values: %+v", s)
 	}
@@ -150,7 +172,9 @@ profiles:
 
 func TestWithProfilePrecedence(t *testing.T) {
 	yes, no := true, false
+	timeout := 5 * time.Second
 	p := Profile{
+		Timeout:     &timeout,
 		Name:        "dev",
 		Schema:      []string{"/p/api.proto"},
 		ImportPaths: []string{"/p"},
@@ -163,14 +187,15 @@ func TestWithProfilePrecedence(t *testing.T) {
 	base := Config{SchemaPaths: []string{"."}, Target: "http://localhost:8080", Protocol: "connect"}
 
 	c := base.WithProfile(p, func(string) bool { return false })
-	if c.Profile != "dev" || c.Target != "https://dev" || c.Protocol != "grpc" || !c.Reflection || c.SchemaPaths[0] != "/p/api.proto" {
+	if c.Profile != "dev" || c.Target != "https://dev" || c.Protocol != "grpc" || !c.Reflection || c.SchemaPaths[0] != "/p/api.proto" || c.Timeout != timeout {
 		t.Errorf("profile not applied: %+v", c)
 	}
 
 	explicit := base
 	explicit.Target = "http://override"
-	c = explicit.WithProfile(p, func(f string) bool { return f == "target" })
-	if c.Target != "http://override" || c.Protocol != "grpc" {
+	explicit.Timeout = time.Minute
+	c = explicit.WithProfile(p, func(f string) bool { return f == "target" || f == "timeout" })
+	if c.Target != "http://override" || c.Protocol != "grpc" || c.Timeout != time.Minute {
 		t.Errorf("explicit flag should win: %+v", c)
 	}
 }

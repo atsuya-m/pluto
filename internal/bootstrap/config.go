@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 )
 
 type Config struct {
@@ -13,6 +14,7 @@ type Config struct {
 	Target      string
 	Protocol    string
 	JSONCodec   bool
+	Timeout     time.Duration
 	Headers     []string
 
 	Profile        string

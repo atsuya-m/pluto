@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
@@ -44,6 +45,7 @@ type Invoker struct {
 	baseURL      *url.URL
 	protocol     Protocol
 	json         bool
+	timeout      time.Duration
 }
 
 type Option func(*Invoker)
@@ -54,6 +56,10 @@ func WithProtocol(p Protocol) Option {
 
 func WithJSON(enabled bool) Option {
 	return func(i *Invoker) { i.json = enabled }
+}
+
+func WithTimeout(d time.Duration) Option {
+	return func(i *Invoker) { i.timeout = d }
 }
 
 func WithHTTPClient(c *http.Client) Option {
@@ -127,6 +133,11 @@ func (i *Invoker) Invoke(ctx context.Context, req invocation.Request) (invocatio
 	creq, err := newRequest(req)
 	if err != nil {
 		return invocation.Response{}, err
+	}
+	if i.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, i.timeout)
+		defer cancel()
 	}
 	res, err := i.newClient(req).CallUnary(ctx, creq)
 	if err != nil {

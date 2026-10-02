@@ -20,15 +20,19 @@ func ParseTarget(target string) (*url.URL, error) {
 	return u, nil
 }
 
-func NewHTTP1() *http.Client {
-	return &http.Client{Timeout: 60 * time.Second}
-}
-
-func NewHTTP2(u *url.URL) *http.Client {
-	transport := &http.Transport{
+func newTransport() *http.Transport {
+	return &http.Transport{
 		Proxy:       http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{Timeout: 10 * time.Second}).DialContext,
 	}
+}
+
+func NewHTTP1() *http.Client {
+	return &http.Client{Transport: newTransport()}
+}
+
+func NewHTTP2(u *url.URL) *http.Client {
+	transport := newTransport()
 	protocols := new(http.Protocols)
 	if u.Scheme == "https" {
 		protocols.SetHTTP2(true)

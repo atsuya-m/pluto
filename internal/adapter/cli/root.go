@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -84,6 +85,7 @@ func newRootCommand(opts *options) *cobra.Command {
 	flags.StringVarP(&opts.cfg.Target, "target", "t", "http://localhost:8080", "server base URL")
 	flags.StringVar(&opts.cfg.Protocol, "protocol", "connect", "wire protocol: connect, grpc, grpcweb")
 	flags.BoolVar(&opts.cfg.JSONCodec, "json-codec", false, "use JSON instead of binary protobuf on the wire")
+	flags.DurationVar(&opts.cfg.Timeout, "timeout", 60*time.Second, "timeout for unary calls (0 for none; streaming calls have no timeout)")
 	flags.StringArrayVarP(&opts.cfg.Headers, "header", "H", nil, "request header 'Key: Value' (repeatable)")
 	flags.StringVarP(&opts.output, "output", "o", "text", "output format: text, json")
 	flags.StringVar(&opts.configPath, "config", "", "config file (default: .pluto.yaml in the current or a parent directory, then user config dir/pluto/config.yaml; env PLUTO_CONFIG)")

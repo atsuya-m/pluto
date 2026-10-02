@@ -327,7 +327,7 @@ pluto profiles                  # プロファイル一覧 (ヘッダーは名�
 
 - 設定ファイルは `--config` (または `PLUTO_CONFIG`) → カレントディレクトリから親をたどって最初に見つかった `.pluto.yaml` → `<ユーザー設定ディレクトリ>/pluto/config.yaml` の順に探す
 - プロファイルは `-p` → `PLUTO_PROFILE` → `default_profile` の順に決まる
-- 使えるキー: `schema` / `import_paths` / `reflection` / `target` / `protocol` / `json_codec` / `headers`。未知のキーはエラーになる
+- 使えるキー: `schema` / `import_paths` / `reflection` / `target` / `protocol` / `json_codec` / `timeout` / `headers`。未知のキーはエラーになる
 - 値の中の `${VAR}` / `$VAR` は環境変数で展開する。参照した環境変数が未設定または空ならエラーにする（空の認証ヘッダーを送らないため）
 - パスの `~` はホームディレクトリ、相対パスは設定ファイルのあるディレクトリからの相対として扱う
 - コマンドラインで明示したフラグはプロファイルより優先する。`-H` で同じ名前のヘッダーを渡すとプロファイルの値を置き換える
@@ -351,6 +351,7 @@ pluto profiles                  # プロファイル一覧 (ヘッダーは名�
 
 - `--json-codec` で wire format を binary protobuf から JSON に変える
 - `-H 'Key: Value'` で request header を付ける（複数指定可）。REPL では `header` コマンドの初期値になる
+- `--timeout` で unary の呼び出しにタイムアウトをかける（既定 `60s`、`0` で無制限）。deadline はサーバーにも `grpc-timeout` / `Connect-Timeout-Ms` として伝わり、超えると `deadline_exceeded` になる。streaming にはかけない（REPL では `esc` / `C-x` で止める）
 - `HTTP_PROXY` / `HTTPS_PROXY` などのプロキシ設定に従う
 
 ## グローバルフラグ
@@ -363,6 +364,7 @@ pluto profiles                  # プロファイル一覧 (ヘッダーは名�
 | `-t, --target` | `http://localhost:8080` | サーバーの base URL（スキームを省略すると `http://`） |
 | `--protocol` | `connect` | `connect` / `grpc` / `grpcweb` |
 | `--json-codec` | `false` | wire format を JSON にする |
+| `--timeout` | `60s` | unary の呼び出しのタイムアウト（`0` で無制限） |
 | `-H, --header` | | `'Key: Value'` 形式の request header（複数指定可） |
 | `-o, --output` | `text` | `text` / `json` |
 | `--config` | 自動で探索 | 設定ファイル（`PLUTO_CONFIG`） |
@@ -415,6 +417,6 @@ testdata/proto                サンプル / テスト用の proto
 
 ## 制限事項
 
-- TLS の詳細設定（証明書検証の無効化、独自 CA、クライアント証明書）とタイムアウトの指定には未対応
+- TLS の詳細設定（証明書検証の無効化、独自 CA、クライアント証明書）には未対応
 - スキーマの読み込み元は proto ファイルと reflection のみ（descriptor set / buf には未対応）
 - REPL で成功時の response header / trailer は表示しない（CLI の `-o json` では出力する。エラー時のメタデータは REPL でも表示する）

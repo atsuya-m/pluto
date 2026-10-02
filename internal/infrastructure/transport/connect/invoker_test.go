@@ -5,8 +5,10 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -342,5 +344,29 @@ func TestParseProtocol(t *testing.T) {
 	}
 	if _, err := connect.ParseProtocol("http3"); err == nil {
 		t.Error("expected error for unknown protocol")
+	}
+}
+
+func TestInvoker_Timeout(t *testing.T) {
+	rpc := fixture.RPC(t, "CreateUser")
+	seen := make(chan string, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen <- r.Header.Get("Connect-Timeout-Ms")
+		<-r.Context().Done()
+	}))
+	t.Cleanup(srv.Close)
+
+	inv, err := connect.NewInvoker(srv.URL, connect.WithTimeout(50*time.Millisecond))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = inv.Invoke(context.Background(), invocation.Request{RPC: rpc, Message: dynamicpb.NewMessage(rpc.Input().Descriptor())})
+
+	var invErr *invocation.Error
+	if !errors.As(err, &invErr) || invErr.Code != "deadline_exceeded" {
+		t.Errorf("error = %v, want deadline_exceeded", err)
+	}
+	if got := <-seen; got == "" {
+		t.Error("server did not receive Connect-Timeout-Ms")
 	}
 }

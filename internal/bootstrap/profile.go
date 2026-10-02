@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -23,6 +24,7 @@ type Profile struct {
 	Target      string
 	Protocol    string
 	JSONCodec   *bool
+	Timeout     *time.Duration
 	Headers     map[string]string
 }
 
@@ -58,6 +60,7 @@ type profileYAML struct {
 	Target      string            `yaml:"target"`
 	Protocol    string            `yaml:"protocol"`
 	JSONCodec   *bool             `yaml:"json_codec"`
+	Timeout     string            `yaml:"timeout"`
 	Headers     map[string]string `yaml:"headers"`
 }
 
@@ -152,6 +155,13 @@ func (c *ConfigFile) Profile(name string, lookup func(string) (string, bool)) (P
 		Target:     e.value(raw.Target),
 		Protocol:   e.value(raw.Protocol),
 	}
+	if raw.Timeout != "" {
+		d, err := time.ParseDuration(raw.Timeout)
+		if err != nil {
+			return Profile{}, fmt.Errorf("profile %q: invalid timeout %q (want a duration such as 30s)", name, raw.Timeout)
+		}
+		p.Timeout = &d
+	}
 	for _, s := range raw.Schema {
 		p.Schema = append(p.Schema, e.path(s))
 	}
@@ -233,6 +243,9 @@ func (c Config) WithProfile(p Profile, changed func(flag string) bool) Config {
 	}
 	if !changed("json-codec") && p.JSONCodec != nil {
 		c.JSONCodec = *p.JSONCodec
+	}
+	if !changed("timeout") && p.Timeout != nil {
+		c.Timeout = *p.Timeout
 	}
 	c.ProfileHeaders = p.Headers
 	return c
