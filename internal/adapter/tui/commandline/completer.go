@@ -20,6 +20,7 @@ var commandSuggestions = []Suggestion{
 	{Text: "services", Description: "list services"},
 	{Text: "edit", Description: "reopen the last request"},
 	{Text: "header", Description: "show or change request headers"},
+	{Text: "view", Description: "explore the last response"},
 	{Text: "reload", Description: "reload the rpc list"},
 	{Text: "clear", Description: "clear the screen"},
 	{Text: "help", Description: "show help"},

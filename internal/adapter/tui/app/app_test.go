@@ -18,6 +18,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
 
+	"github.com/atsuya-m/pluto/internal/adapter/tui/commandline"
 	"github.com/atsuya-m/pluto/internal/application/invocation"
 	"github.com/atsuya-m/pluto/internal/application/usecase"
 	"github.com/atsuya-m/pluto/internal/domain/request"
@@ -212,8 +213,8 @@ func TestApp_CallFlow(t *testing.T) {
 	}
 
 	h.key(tea.KeyEnter)
-	if h.app().Mode() != ModeResponseViewer {
-		t.Fatalf("mode = %v, want response viewer", h.app().Mode())
+	if h.app().Mode() != ModeCommand {
+		t.Fatalf("after sending, the prompt should be ready: mode = %v", h.app().Mode())
 	}
 	if h.invoke.callCount() != 1 || h.invoke.calls[0].RPCName != "user.v1.UserService.CreateUser" {
 		t.Errorf("invoke calls = %+v", h.invoke.calls)
@@ -221,23 +222,15 @@ func TestApp_CallFlow(t *testing.T) {
 	if !strings.Contains(h.output(), `"id": "u-1"`) {
 		t.Errorf("response was not printed:\n%s", h.output())
 	}
-	if !strings.Contains(h.app().View(), "✔ OK") {
-		t.Errorf("response view:\n%s", h.app().View())
+	if !strings.Contains(h.app().View(), "pluto>") {
+		t.Errorf("the command line should be shown:\n%s", h.app().View())
 	}
 
 	h.typeText("c")
-	if h.invoke.callCount() != 1 {
-		t.Errorf("c must not resend the request: calls = %d", h.invoke.callCount())
+	if h.invoke.callCount() != 1 || h.app().command.Value() != "c" {
+		t.Errorf("keys after sending should go to the prompt: calls = %d, input = %q", h.invoke.callCount(), h.app().command.Value())
 	}
-
-	h.typeText("e")
-	if h.app().Mode() != ModeRequestEditor {
-		t.Errorf("e should return to the editor, mode = %v", h.app().Mode())
-	}
-	h.key(tea.KeyEsc)
-	if h.app().Mode() != ModeCommand {
-		t.Errorf("esc from editor root should return to command, mode = %v", h.app().Mode())
-	}
+	h.key(tea.KeyCtrlU)
 
 	h.submit("edit")
 	if h.app().Mode() != ModeRequestEditor {
@@ -296,7 +289,7 @@ func TestApp_ServerStreamFlow(t *testing.T) {
 	h.submit("call WatchUsers")
 	h.key(tea.KeyCtrlS)
 	h.key(tea.KeyEnter)
-	waitFor(t, h, func() bool { return h.app().Mode() == ModeResponseViewer })
+	waitFor(t, h, func() bool { return h.app().Mode() == ModeCommand })
 
 	out := h.output()
 	for _, want := range []string{"← #1", `"id": "u-1"`, "← #3", `"id": "u-3"`, "stream closed"} {
@@ -307,8 +300,8 @@ func TestApp_ServerStreamFlow(t *testing.T) {
 	if strings.Index(out, `"u-1"`) > strings.Index(out, `"u-3"`) {
 		t.Errorf("messages printed out of order:\n%s", out)
 	}
-	if !strings.Contains(h.app().View(), "stream closed · 3 messages") {
-		t.Errorf("view:\n%s", h.app().View())
+	if !strings.Contains(out, "(3 messages") {
+		t.Errorf("summary missing:\n%s", out)
 	}
 }
 
@@ -331,9 +324,9 @@ func TestApp_ServerStreamStopWithEsc(t *testing.T) {
 	}
 
 	h.key(tea.KeyEsc)
-	waitFor(t, h, func() bool { return h.app().Mode() == ModeResponseViewer })
-	if !strings.Contains(h.app().View(), "stopped · 1 messages") {
-		t.Errorf("view:\n%s", h.app().View())
+	waitFor(t, h, func() bool { return h.app().Mode() == ModeCommand })
+	if !strings.Contains(h.output(), "■ stopped") || !strings.Contains(h.output(), "(1 messages") {
+		t.Errorf("output:\n%s", h.output())
 	}
 }
 
@@ -347,9 +340,9 @@ func TestApp_ServerStreamError(t *testing.T) {
 	h.submit("call WatchUsers")
 	h.key(tea.KeyCtrlS)
 	h.key(tea.KeyEnter)
-	waitFor(t, h, func() bool { return h.app().Mode() == ModeResponseViewer })
-	if !strings.Contains(h.app().View(), "✘ unavailable") || !strings.Contains(h.output(), "stream broken") {
-		t.Errorf("view:\n%s\noutput:\n%s", h.app().View(), h.output())
+	waitFor(t, h, func() bool { return h.app().Mode() == ModeCommand })
+	if !strings.Contains(h.output(), "unavailable") || !strings.Contains(h.output(), "stream broken") {
+		t.Errorf("output:\n%s", h.output())
 	}
 }
 
@@ -377,15 +370,11 @@ func TestApp_InvokeFailure(t *testing.T) {
 	h.key(tea.KeyCtrlS)
 	h.key(tea.KeyEnter)
 
-	if h.app().Mode() != ModeResponseViewer || !strings.Contains(h.app().View(), "✘ invalid_argument") {
-		t.Errorf("mode = %v, view:\n%s", h.app().Mode(), h.app().View())
+	if h.app().Mode() != ModeCommand || !strings.Contains(h.output(), "invalid_argument") {
+		t.Errorf("mode = %v, output:\n%s", h.app().Mode(), h.output())
 	}
 	if !strings.Contains(h.output(), "name is required") {
 		t.Errorf("error was not printed:\n%s", h.output())
-	}
-	h.typeText("q")
-	if h.app().Mode() != ModeCommand {
-		t.Errorf("q should return to command, mode = %v", h.app().Mode())
 	}
 }
 
@@ -431,8 +420,8 @@ func TestApp_EscCancelsInFlightInvocation(t *testing.T) {
 				t.Errorf("invoke error = %v, want context.Canceled", failed.Err)
 			}
 			h.send(msg)
-			if h.app().Mode() != ModeResponseViewer {
-				t.Errorf("mode = %v, want response viewer", h.app().Mode())
+			if h.app().Mode() != ModeCommand {
+				t.Errorf("mode = %v, want command", h.app().Mode())
 			}
 			return
 		}
@@ -618,15 +607,15 @@ func TestApp_ClientStreamCompose(t *testing.T) {
 	waitFor(t, h, func() bool { return h.app().sentCount == 2 })
 
 	h.key(tea.KeyCtrlX)
-	waitFor(t, h, func() bool { return h.app().Mode() == ModeResponseViewer })
+	waitFor(t, h, func() bool { return h.app().Mode() == ModeCommand })
 	out := h.output()
 	for _, want := range []string{"→ #1", `"name": "A"`, "→ #2", `"name": "B"`, "← #1", `"imported": 2`} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q:\n%s", want, out)
 		}
 	}
-	if !strings.Contains(h.app().View(), "stream closed · 2 sent · 1 received") {
-		t.Errorf("view:\n%s", h.app().View())
+	if !strings.Contains(out, "(2 sent · 1 received") {
+		t.Errorf("summary missing:\n%s", out)
 	}
 	if h.opener.headers[0].Get("X-Initial") != "1" {
 		t.Errorf("stream headers = %v", h.opener.headers[0])
@@ -653,9 +642,9 @@ func TestApp_BidiStreamCompose(t *testing.T) {
 	}
 
 	h.key(tea.KeyEsc)
-	waitFor(t, h, func() bool { return h.app().Mode() == ModeResponseViewer })
-	if !strings.Contains(h.app().View(), "stopped · 1 sent · 1 received") {
-		t.Errorf("view:\n%s", h.app().View())
+	waitFor(t, h, func() bool { return h.app().Mode() == ModeCommand })
+	if !strings.Contains(h.output(), "■ stopped") || !strings.Contains(h.output(), "(1 sent · 1 received") {
+		t.Errorf("output:\n%s", h.output())
 	}
 }
 
@@ -681,7 +670,6 @@ func TestApp_HeaderCommands(t *testing.T) {
 		t.Errorf("invoke headers = %v", got)
 	}
 
-	h.typeText("q")
 	h.submit("header bogus")
 	if !strings.Contains(h.output(), "usage: header") {
 		t.Errorf("usage error missing:\n%s", h.output())
@@ -707,44 +695,47 @@ func bigResponse(t *testing.T, users int) func(context.Context, usecase.InvokeRP
 	}
 }
 
-func TestApp_LargeResponseOpensExplorer(t *testing.T) {
+func TestApp_LargeResponseCanBeExploredWithView(t *testing.T) {
 	h := newHarness(t, bigResponse(t, 50))
 	h.submit("ListUsers")
 	h.key(tea.KeyCtrlS)
 	h.key(tea.KeyEnter)
 
-	if !h.app().exploring {
-		t.Fatalf("large response should open the explorer:\n%s", h.app().View())
+	if h.app().Mode() != ModeCommand {
+		t.Fatalf("after sending, the prompt should be ready: mode = %v", h.app().Mode())
 	}
 	out := h.output()
-	if strings.Contains(out, `"u-49"`) || !strings.Contains(out, "exploring below") {
-		t.Errorf("the full body should not be printed:\n%s", out)
+	if !strings.Contains(out, `"u-49"`) || !strings.Contains(out, "`view` to explore") {
+		t.Errorf("the full body and a hint should be printed:\n%s", out)
+	}
+
+	h.submit("view")
+	if h.app().Mode() != ModeExplorer {
+		t.Fatalf("view should open the explorer, mode = %v", h.app().Mode())
 	}
 	view := h.app().View()
-	if !strings.Contains(view, "users") || !strings.Contains(view, "[50 items]") || strings.Count(view, "\n") > 40 {
+	if !strings.Contains(view, "[50 items]") || strings.Count(view, "\n") > 40 {
 		t.Errorf("view:\n%s", view)
 	}
 
-	h.key(tea.KeyDown)
-	h.key(tea.KeyEnter)
 	h.typeText("/")
 	h.typeText("q")
-	if h.app().Mode() != ModeResponseViewer || !h.app().viewer.Searching() {
-		t.Fatalf("q while searching must not leave the explorer, mode = %v", h.app().Mode())
+	if h.app().Mode() != ModeExplorer || !h.app().viewer.Searching() {
+		t.Fatalf("q while searching must not close the explorer, mode = %v", h.app().Mode())
 	}
 	h.key(tea.KeyEsc)
-	if h.app().Mode() != ModeResponseViewer {
+	if h.app().Mode() != ModeExplorer {
 		t.Fatalf("esc should only cancel the search, mode = %v", h.app().Mode())
 	}
 
 	h.typeText("p")
-	if !strings.Contains(h.output(), `"u-49"`) {
-		t.Error("p should print the full body")
+	if strings.Count(h.output(), `"u-49"`) != 1 {
+		t.Error("p no longer prints the body")
 	}
 
 	h.typeText("q")
-	if h.app().Mode() != ModeCommand || h.app().exploring {
-		t.Errorf("q should leave the response, mode = %v", h.app().Mode())
+	if h.app().Mode() != ModeCommand {
+		t.Errorf("q should go back to the prompt, mode = %v", h.app().Mode())
 	}
 }
 
@@ -753,19 +744,16 @@ func TestApp_SmallResponseCanBeExplored(t *testing.T) {
 	h.submit("call CreateUser")
 	h.key(tea.KeyCtrlS)
 	h.key(tea.KeyEnter)
-	if h.app().exploring || !strings.Contains(h.output(), `"id": "u-1"`) {
-		t.Fatalf("small response should be printed as before")
+	if h.app().Mode() != ModeCommand || !strings.Contains(h.output(), `"id": "u-1"`) || strings.Contains(h.output(), "`view` to explore") {
+		t.Fatalf("small response should be printed without a hint:\n%s", h.output())
 	}
-	if !strings.Contains(h.app().View(), "v explore") {
-		t.Errorf("view:\n%s", h.app().View())
+	h.submit("view")
+	if h.app().Mode() != ModeExplorer || !strings.Contains(h.app().View(), "user.v1.UserService.CreateUser") {
+		t.Errorf("view should open the explorer:\n%s", h.app().View())
 	}
-	h.typeText("v")
-	if !h.app().exploring || !strings.Contains(h.app().View(), ".user") {
-		t.Errorf("v should open the explorer:\n%s", h.app().View())
-	}
-	h.typeText("e")
-	if h.app().Mode() != ModeRequestEditor || h.app().exploring {
-		t.Errorf("e should go back to the editor, mode = %v", h.app().Mode())
+	h.key(tea.KeyEsc)
+	if h.app().Mode() != ModeCommand {
+		t.Errorf("esc should go back to the prompt, mode = %v", h.app().Mode())
 	}
 }
 
@@ -780,23 +768,27 @@ func TestApp_ExploreLastStreamMessage(t *testing.T) {
 	h.submit("call WatchUsers")
 	h.key(tea.KeyCtrlS)
 	h.key(tea.KeyEnter)
-	waitFor(t, h, func() bool { return h.app().Mode() == ModeResponseViewer })
-	h.typeText("v")
-	if !h.app().exploring || !strings.Contains(h.app().View(), `"u-2"`) {
-		t.Errorf("v should explore the last message:\n%s", h.app().View())
+	waitFor(t, h, func() bool { return h.app().Mode() == ModeCommand })
+	h.submit("view")
+	if h.app().Mode() != ModeExplorer || !strings.Contains(h.app().View(), `"u-2"`) {
+		t.Errorf("view should explore the last message:\n%s", h.app().View())
 	}
 }
 
-func TestApp_FailedResponseHasNoExplorer(t *testing.T) {
+func TestApp_ViewWithoutResponse(t *testing.T) {
 	h := newHarness(t, func(context.Context, usecase.InvokeRPCInput) (usecase.InvokeRPCOutput, error) {
 		return usecase.InvokeRPCOutput{}, &invocation.Error{Code: "internal", Message: "boom"}
 	})
+	h.submit("view")
+	if h.app().Mode() != ModeCommand || !strings.Contains(h.output(), "no response to view yet") {
+		t.Errorf("mode = %v, output:\n%s", h.app().Mode(), h.output())
+	}
 	h.submit("call CreateUser")
 	h.key(tea.KeyCtrlS)
 	h.key(tea.KeyEnter)
-	h.typeText("v")
-	if h.app().exploring || strings.Contains(h.app().View(), "v explore") {
-		t.Errorf("errors have nothing to explore:\n%s", h.app().View())
+	h.submit("view")
+	if h.app().Mode() != ModeCommand || strings.Count(h.output(), "no response to view yet") != 2 {
+		t.Errorf("errors have nothing to explore:\n%s", h.output())
 	}
 }
 
@@ -810,7 +802,7 @@ func TestApp_CopyFromExplorer(t *testing.T) {
 	h.submit("call CreateUser")
 	h.key(tea.KeyCtrlS)
 	h.key(tea.KeyEnter)
-	h.typeText("v")
+	h.submit("view")
 	h.typeText("jj")
 	if cur := h.app().viewer.Current(); cur == nil || cur.Path() != ".user.name" {
 		t.Fatalf("cursor at %v", cur)
@@ -845,9 +837,70 @@ func TestApp_CopyFailure(t *testing.T) {
 	h.submit("call CreateUser")
 	h.key(tea.KeyCtrlS)
 	h.key(tea.KeyEnter)
-	h.typeText("v")
+	h.submit("view")
 	h.typeText("y")
 	if !strings.Contains(h.app().View(), "copy failed: no clipboard") {
 		t.Errorf("view:\n%s", h.app().View())
+	}
+}
+
+func collectMsgs(cmd tea.Cmd) []tea.Msg {
+	if cmd == nil {
+		return nil
+	}
+	done := make(chan tea.Msg, 1)
+	go func() { done <- cmd() }()
+	var msg tea.Msg
+	select {
+	case msg = <-done:
+	case <-time.After(200 * time.Millisecond):
+		return nil
+	}
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		var out []tea.Msg
+		for _, c := range batch {
+			out = append(out, collectMsgs(c)...)
+		}
+		return out
+	}
+	if v := reflect.ValueOf(msg); v.IsValid() && v.Kind() == reflect.Slice && v.Type().Elem() == reflect.TypeOf(tea.Cmd(nil)) {
+		var out []tea.Msg
+		for i := 0; i < v.Len(); i++ {
+			out = append(out, collectMsgs(v.Index(i).Interface().(tea.Cmd))...)
+		}
+		return out
+	}
+	return []tea.Msg{msg}
+}
+
+func quits(cmd tea.Cmd) bool {
+	for _, m := range collectMsgs(cmd) {
+		if _, ok := m.(tea.QuitMsg); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func TestApp_QuitOnlyWithCtrlCOrExit(t *testing.T) {
+	h := newHarness(t, okResponse(t))
+
+	_, cmd := h.model.Update(tea.KeyMsg{Type: tea.KeyCtrlD})
+	if quits(cmd) {
+		t.Error("ctrl+d must not quit")
+	}
+
+	h.submit("quit")
+	if !strings.Contains(h.output(), `unknown command or rpc "quit"`) {
+		t.Errorf("quit should no longer be a command:\n%s", h.output())
+	}
+
+	_, cmd = h.model.Update(commandline.SubmitMsg{Input: "exit"})
+	if !quits(cmd) {
+		t.Error("exit should quit")
+	}
+	_, cmd = h.model.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	if !quits(cmd) {
+		t.Error("ctrl+c should quit")
 	}
 }

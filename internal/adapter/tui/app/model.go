@@ -8,7 +8,6 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/atsuya-m/pluto/internal/adapter/presenter/errdetail"
 	"github.com/atsuya-m/pluto/internal/adapter/tui/clipboard"
 	"github.com/atsuya-m/pluto/internal/adapter/tui/commandline"
 	"github.com/atsuya-m/pluto/internal/adapter/tui/jsonview"
@@ -27,41 +26,35 @@ const (
 	ModePreview
 	ModeInvoking
 	ModeStreaming
-	ModeResponseViewer
+	ModeExplorer
 )
 
 type KeyMap struct {
-	Quit    key.Binding
-	Send    key.Binding
-	Edit    key.Binding
-	Back    key.Binding
-	Finish  key.Binding
-	Explore key.Binding
-	Print   key.Binding
+	Quit   key.Binding
+	Send   key.Binding
+	Edit   key.Binding
+	Back   key.Binding
+	Finish key.Binding
 }
 
 func DefaultKeyMap() KeyMap {
 	return KeyMap{
-		Quit:    key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit")),
-		Send:    key.NewBinding(key.WithKeys("enter", "ctrl+s"), key.WithHelp("enter", "send")),
-		Edit:    key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit request")),
-		Back:    key.NewBinding(key.WithKeys("esc", "q", "ctrl+g"), key.WithHelp("q/esc", "back")),
-		Finish:  key.NewBinding(key.WithKeys("ctrl+x"), key.WithHelp("C-x", "finish sending")),
-		Explore: key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "explore")),
-		Print:   key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "print")),
+		Quit:   key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit")),
+		Send:   key.NewBinding(key.WithKeys("enter", "ctrl+s"), key.WithHelp("enter", "send")),
+		Edit:   key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit request")),
+		Back:   key.NewBinding(key.WithKeys("esc", "q", "ctrl+g"), key.WithHelp("q/esc", "back")),
+		Finish: key.NewBinding(key.WithKeys("ctrl+x"), key.WithHelp("C-x", "finish sending")),
 	}
 }
 
 type result struct {
 	ok       bool
-	stream   bool
 	clientSt bool
 	stopped  bool
 	count    int
 	sent     int
 	rpc      string
 	duration string
-	detail   errdetail.ErrorDetail
 }
 
 type Model struct {
@@ -81,7 +74,6 @@ type Model struct {
 	hasEditor bool
 	rpcs      []usecase.RPCSummary
 	loadErr   error
-	result    result
 	cancel    context.CancelFunc
 
 	streamEvents <-chan tea.Msg
@@ -94,11 +86,11 @@ type Model struct {
 
 	headers http.Header
 
-	body      string
-	lastBody  string
-	viewer    jsonview.Model
-	exploring bool
-	notice    string
+	body     string
+	lastBody string
+	viewer   jsonview.Model
+	bodyRPC  string
+	notice   string
 }
 
 func NewModel(ctx context.Context, deps Dependencies) Model {

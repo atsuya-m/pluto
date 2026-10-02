@@ -83,19 +83,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case invokedMsg:
 		m.cancel = nil
-		duration := msg.Duration.Round(1e6).String()
-		m.result = result{ok: true, rpc: msg.Output.RPC.FullName, duration: duration}
-		m.mode = ModeResponseViewer
+		m.mode = ModeCommand
 		m.body, _ = textpresenter.ProtoJSON(msg.Output.Message)
-		m.exploring = false
+		m.bodyRPC = msg.Output.RPC.FullName
+		out := renderResponse(m.editor.RPC(), msg.Output, msg.Duration.Round(1e6).String())
 		if lines := strings.Count(m.body, "\n") + 1; lines > m.viewerHeight() {
-			m = m.openViewer()
-			if m.exploring {
-				return m, tea.Println(fmt.Sprintf("%s %s %s", style.Success.Render("✔"), msg.Output.RPC.FullName,
-					style.Subtle.Render(fmt.Sprintf("(%s, %d lines • exploring below, p prints the full body)", duration, lines))))
-			}
+			out += "\n" + style.Subtle.Render(fmt.Sprintf("(%d lines • `view` to explore)", lines))
 		}
-		return m, tea.Println(renderResponse(m.editor.RPC(), msg.Output, duration))
+		return m, tea.Batch(tea.Println(out), m.command.Focus())
 
 	case streamStartedMsg:
 		m.streamEvents = msg.Events
@@ -138,14 +133,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			_ = m.session.Close()
 		}
 		clientStreaming := m.editor.RPC().ClientStreaming
-		m.body, m.lastBody, m.exploring = m.lastBody, "", false
+		m.body, m.lastBody = m.lastBody, ""
+		m.bodyRPC = m.editor.RPC().FullName
 		m.session = nil
 		m.cancel = nil
 		m.streamEvents = nil
-		m.mode = ModeResponseViewer
-		m.result = result{
+		m.mode = ModeCommand
+		r := result{
 			ok:       msg.Err == nil,
-			stream:   true,
 			clientSt: clientStreaming,
 			count:    m.streamCount,
 			sent:     m.sentCount,
@@ -153,22 +148,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			duration: msg.Duration.Round(1e6).String(),
 		}
 		if msg.Err != nil && m.stopping && (errors.Is(msg.Err, context.Canceled) || errdetail.From(msg.Err).Code == "canceled") {
-			m.result.ok, m.result.stopped = true, true
+			r.ok, r.stopped = true, true
 		}
 		m.stopping = false
-		if !m.result.ok {
-			m.result.detail = errdetail.From(msg.Err)
-			return m, tea.Println(renderError(m.result.rpc+" failed", m.result.detail))
+		if !r.ok {
+			return m, tea.Batch(tea.Println(renderError(r.rpc+" failed", errdetail.From(msg.Err))), m.command.Focus())
 		}
-		return m, tea.Println(renderStreamSummary(m.result))
+		return m, tea.Batch(tea.Println(renderStreamSummary(r)), m.command.Focus())
 
 	case invokeFailedMsg:
 		m.cancel = nil
-		m.body, m.exploring = "", false
-		d := errdetail.From(msg.Err)
-		m.result = result{ok: false, rpc: m.editor.RPC().FullName, duration: msg.Duration.Round(1e6).String(), detail: d}
-		m.mode = ModeResponseViewer
-		return m, tea.Println(renderError(m.editor.RPC().FullName+" failed", d))
+		m.mode = ModeCommand
+		return m, tea.Batch(tea.Println(renderError(m.editor.RPC().FullName+" failed", errdetail.From(msg.Err))), m.command.Focus())
 	}
 
 	switch m.mode {
@@ -180,8 +171,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updatePreview(msg)
 	case ModeInvoking, ModeStreaming:
 		return m.updateInvoking(msg)
-	case ModeResponseViewer:
-		return m.updateResponse(msg)
+	case ModeExplorer:
+		return m.updateExplorer(msg)
 	default:
 		return m.updateCommand(msg)
 	}
@@ -189,7 +180,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func splitRunes(mode Mode) bool {
 	switch mode {
-	case ModePreview, ModeResponseViewer, ModeInvoking, ModeStreaming:
+	case ModePreview, ModeExplorer, ModeInvoking, ModeStreaming:
 		return true
 	default:
 		return false
@@ -197,9 +188,6 @@ func splitRunes(mode Mode) bool {
 }
 
 func (m Model) updateCommand(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if k, ok := msg.(tea.KeyMsg); ok && k.String() == "ctrl+d" && m.command.Value() == "" {
-		return m, tea.Quit
-	}
 	if sub, ok := msg.(commandline.SubmitMsg); ok {
 		return m.execute(sub.Input)
 	}
@@ -220,7 +208,7 @@ func (m Model) execute(input string) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "help", "?":
 		return m, tea.Sequence(echo, tea.Println(helpText))
-	case "exit", "quit":
+	case "exit":
 		return m, tea.Sequence(echo, tea.Quit)
 	case "clear":
 		return m, tea.ClearScreen
@@ -244,6 +232,12 @@ func (m Model) execute(input string) (tea.Model, tea.Cmd) {
 		m.headers = next
 		m.command.SetHeaderKeys(headerKeys(next))
 		return m, tea.Sequence(echo, tea.Println(style.Subtle.Render(note)))
+	case "view":
+		if m.body == "" {
+			return m, tea.Sequence(echo, tea.Println(style.Error.Render("✘ no response to view yet")))
+		}
+		m = m.openViewer()
+		return m, echo
 	case "desc", "describe":
 		switch {
 		case len(c.Args) == 1:
@@ -413,59 +407,28 @@ func (m Model) viewerHeight() int {
 }
 
 func (m Model) openViewer() Model {
-	if m.body == "" {
-		return m
-	}
 	viewer, err := jsonview.New([]byte(m.body), m.width, m.viewerHeight())
 	if err != nil {
 		return m
 	}
 	m.viewer = viewer
-	m.exploring = true
+	m.notice = ""
+	m.mode = ModeExplorer
 	return m
 }
 
-func (m Model) updateResponse(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) updateExplorer(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
 	k, ok := msg.(tea.KeyMsg)
 	if !ok {
-		if m.exploring {
-			var cmd tea.Cmd
-			m.viewer, cmd = m.viewer.Update(msg)
-			return m, cmd
-		}
-		return m, nil
+		m.viewer, cmd = m.viewer.Update(msg)
+		return m, cmd
 	}
 	m.notice = ""
-	if m.exploring && m.viewer.Searching() {
-		var cmd tea.Cmd
-		m.viewer, cmd = m.viewer.Update(k)
-		return m, cmd
-	}
-	switch {
-	case key.Matches(k, m.keys.Explore):
-		if !m.exploring {
-			m = m.openViewer()
-		}
-		return m, nil
-	case key.Matches(k, m.keys.Print):
-		if m.body == "" {
-			return m, nil
-		}
-		return m, tea.Println(m.body)
-	}
-	if m.exploring && !key.Matches(k, m.keys.Edit) && !key.Matches(k, m.keys.Back) {
-		var cmd tea.Cmd
-		m.viewer, cmd = m.viewer.Update(k)
-		return m, cmd
-	}
-	switch {
-	case key.Matches(k, m.keys.Edit):
-		m.mode = ModeRequestEditor
-		m.exploring = false
-	case key.Matches(k, m.keys.Back), k.String() == "enter":
+	if !m.viewer.Searching() && key.Matches(k, m.keys.Back) {
 		m.mode = ModeCommand
-		m.exploring = false
 		return m, m.command.Focus()
 	}
-	return m, nil
+	m.viewer, cmd = m.viewer.Update(k)
+	return m, cmd
 }

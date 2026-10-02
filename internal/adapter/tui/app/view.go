@@ -24,7 +24,8 @@ const helpText = `commands:
   edit                    reopen the last request
   reload                  reload rpc list for completion
   clear                   clear the screen
-  exit                    quit (ctrl+d / ctrl+c)
+  view                    explore the last response (fold, search, y/Y copy)
+  exit                    quit (or ctrl+c)
 
 completion: suggestions pop up while typing • tab/shift+tab select • esc dismiss
 history:    ↑/↓ or ctrl+p/ctrl+n (while no suggestion is selected)
@@ -53,8 +54,8 @@ func (m Model) View() string {
 			return fmt.Sprintf("%s Streaming %s... %d sent · %d received  %s\n", m.spinner.View(), m.editor.RPC().FullName, m.sentCount, m.streamCount, style.Help.Render("esc stop"))
 		}
 		return fmt.Sprintf("%s Streaming %s... %d messages  %s\n", m.spinner.View(), m.editor.RPC().FullName, m.streamCount, style.Help.Render("esc stop"))
-	case ModeResponseViewer:
-		return m.responseView()
+	case ModeExplorer:
+		return m.explorerView()
 	default:
 		return m.commandView()
 	}
@@ -65,7 +66,7 @@ func (m Model) commandView() string {
 	if m.loadErr != nil {
 		status = style.Error.Render("schema load failed")
 	}
-	return m.command.View() + "\n" + style.Help.Render("tab complete • ↑/↓ history • help • ctrl+d quit • ") + status
+	return m.command.View() + "\n" + style.Help.Render("tab complete • ↑/↓ history • help • ctrl+c quit • ") + status
 }
 
 func (m Model) previewView() string {
@@ -86,30 +87,13 @@ func (m Model) previewView() string {
 	return b.String()
 }
 
-func (m Model) responseView() string {
-	head := style.Success.Render("✔ OK")
-	switch {
-	case !m.result.ok:
-		head = style.Failure.Render("✘ " + m.result.detail.Code)
-	case m.result.stopped:
-		head = style.Success.Render("■ stopped · " + streamCounts(m.result))
-	case m.result.stream:
-		head = style.Success.Render("✔ stream closed · " + streamCounts(m.result))
-	}
-	status := fmt.Sprintf("%s %s %s", head, m.result.rpc, style.Subtle.Render("("+m.result.duration+")"))
+func (m Model) explorerView() string {
+	head := style.Title.Render("response") + style.Subtle.Render("  "+m.bodyRPC)
 	notice := ""
 	if m.notice != "" {
 		notice = "\n" + m.notice
 	}
-	if m.exploring {
-		return status + "\n" + m.viewer.View() + notice + "\n" +
-			style.Help.Render(m.viewer.Help()+" • p print • e edit • q back")
-	}
-	help := "e edit request • q/enter back"
-	if m.body != "" {
-		help = "v explore • p print • " + help
-	}
-	return status + notice + "\n" + style.Help.Render(help)
+	return head + "\n" + m.viewer.View() + notice + "\n" + style.Help.Render(m.viewer.Help()+" • q back")
 }
 
 func renderResponse(rpc usecase.RPCSummary, out usecase.InvokeRPCOutput, duration string) string {

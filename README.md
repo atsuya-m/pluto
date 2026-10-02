@@ -112,7 +112,8 @@ AltScreen は使わず、コマンドの結果・送信した request・response
 | `header set\|add <Key> <value>` | request header を設定 / 追加する。以降のすべての呼び出しに付く |
 | `header rm <Key>` / `header clear` | request header を削除する |
 | `reload` | RPC 一覧を読み直す（補完用） |
-| `clear` / `help` / `exit` | 画面クリア / ヘルプ / 終了（`C-d`、`C-c` でも終了） |
+| `view` | 直前の response を折りたたみビューで開く（streaming では最後に受信したメッセージ） |
+| `clear` / `help` / `exit` | 画面クリア / ヘルプ / 終了（`C-c` でも終了） |
 
 RPC 名は `CreateUser`、`UserService.CreateUser`、`user.v1.UserService.CreateUser`、`user.v1.UserService/CreateUser` のどれでも指定できる。候補が複数ある場合は勝手に選ばず、候補一覧を表示する。
 
@@ -164,19 +165,14 @@ CreateUser  ›  CreateUserRequest
 
 `C-s` でプレビューを開き、`enter` で送信する。送信中は `esc` でキャンセルできる。
 
-| キー | 操作 |
-|---|---|
-| `e` | request editor に戻って編集する |
-| `v` | response を折りたたみビューで開く（streaming では最後に受信したメッセージ） |
-| `p` | response の全文をスクロールバックに出す |
-| `q` / `esc` | コマンド入力に戻る（折りたたみビューを開いていないときは `enter` も） |
+response はスクロールバックに出力され、すぐに次のコマンドを入力できる状態に戻る。端末の高さに収まらない response には `view` で探索できることを示す1行を添える。同じ request を編集し直すときは `edit` を使う。
 
 #### 折りたたみビュー
 
-端末の高さに収まらない response はスクロールバックに流さず、折りたたみビューで開く（収まる response も `v` で開ける）。最初は画面に収まる深さまで展開した状態で開く。
+`view` で直前の response を開く。最初は画面に収まる深さまで展開した状態で開き、`q` / `esc` でコマンド入力に戻る。
 
 ```text
-✔ OK user.v1.UserService.ListUsers (4ms)
+response  user.v1.UserService.ListUsers
  ▾ users: [40 items]
    ▸ [0]: {6 keys}
    ▾ [1]: {6 keys}
