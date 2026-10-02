@@ -91,6 +91,9 @@ type Model struct {
 	viewer   jsonview.Model
 	bodyRPC  string
 	notice   string
+
+	resHeaders  http.Header
+	resTrailers http.Header
 }
 
 func NewModel(ctx context.Context, deps Dependencies) Model {

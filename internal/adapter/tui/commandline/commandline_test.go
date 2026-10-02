@@ -98,6 +98,7 @@ func TestCompleter_Headers(t *testing.T) {
 		{"header rm ", []string{"Authorization", "X-Trace"}},
 		{"header set x", []string{"X-Trace"}},
 		{"load ", nil},
+		{"view ", []string{"headers"}},
 		{"he", []string{"header", "help"}},
 	}
 	for _, tt := range tests {

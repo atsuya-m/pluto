@@ -113,13 +113,14 @@ AltScreen は使わず、コマンドの結果・送信した request・response
 | `header rm <Key>` / `header clear` | request header を削除する |
 | `reload` | RPC 一覧を読み直す（補完用） |
 | `view` | 直前の response を折りたたみビューで開く（streaming では最後に受信したメッセージ） |
+| `view headers` | 直前の response の header と trailer を表示する（機微な値は伏せ字） |
 | `clear` / `help` / `exit` | 画面クリア / ヘルプ / 終了（`C-c` でも終了） |
 
 RPC 名は `CreateUser`、`UserService.CreateUser`、`user.v1.UserService.CreateUser`、`user.v1.UserService/CreateUser` のどれでも指定できる。候補が複数ある場合は勝手に選ばず、候補一覧を表示する。
 
 ### 入力と補完
 
-- 入力中は補完候補がポップアップする。先頭では コマンドと RPC、`call ` の後では RPC、`rpcs ` の後では service、`header rm ` の後では header 名が候補になる
+- 入力中は補完候補がポップアップする。先頭では コマンドと RPC、`call ` の後では RPC、`rpcs ` の後では service、`view ` の後では `headers`、`header rm ` の後では header 名が候補になる
 - `tab` / `shift+tab` で候補を選ぶ。候補が1つなら `tab` で確定する。`esc` / `C-g` でポップアップを閉じる
 - 候補を選んでいないときの `↑` / `↓` / `C-p` / `C-n` は履歴移動
 - 入力欄は emacs キーバインド（`C-a` `C-e` `C-b` `C-f` `C-k` `C-u` `C-w` `C-d` `M-b` `M-f` `M-d`）で編集できる
@@ -419,4 +420,3 @@ testdata/proto                サンプル / テスト用の proto
 
 - TLS の詳細設定（証明書検証の無効化、独自 CA、クライアント証明書）には未対応
 - スキーマの読み込み元は proto ファイルと reflection のみ（descriptor set / buf には未対応）
-- REPL で成功時の response header / trailer は表示しない（CLI の `-o json` では出力する。エラー時のメタデータは REPL でも表示する）

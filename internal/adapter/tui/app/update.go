@@ -86,6 +86,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.mode = ModeCommand
 		m.body, _ = textpresenter.ProtoJSON(msg.Output.Message)
 		m.bodyRPC = msg.Output.RPC.FullName
+		m.resHeaders, m.resTrailers = msg.Output.Headers, msg.Output.Trailers
 		out := renderResponse(m.editor.RPC(), msg.Output, msg.Duration.Round(1e6).String())
 		if lines := strings.Count(m.body, "\n") + 1; lines > m.viewerHeight() {
 			out += "\n" + style.Subtle.Render(fmt.Sprintf("(%d lines • `view` to explore)", lines))
@@ -129,7 +130,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Println(renderError("send failed", errdetail.From(msg.Err)))
 
 	case streamDoneMsg:
+		m.resHeaders, m.resTrailers = msg.Output.Headers, msg.Output.Trailers
 		if m.session != nil {
+			m.resHeaders, m.resTrailers = m.session.Headers(), m.session.Trailers()
 			_ = m.session.Close()
 		}
 		clientStreaming := m.editor.RPC().ClientStreaming
@@ -235,6 +238,12 @@ func (m Model) execute(input string) (tea.Model, tea.Cmd) {
 	case "view":
 		if m.body == "" {
 			return m, tea.Sequence(echo, tea.Println(style.Error.Render("✘ no response to view yet")))
+		}
+		if len(c.Args) == 1 && c.Args[0] == "headers" {
+			return m, tea.Sequence(echo, tea.Println(formatResponseMetadata(m.resHeaders, m.resTrailers)))
+		}
+		if len(c.Args) > 0 {
+			return m, tea.Sequence(echo, tea.Println(style.Error.Render("✘ usage: view [headers]")))
 		}
 		m = m.openViewer()
 		return m, echo

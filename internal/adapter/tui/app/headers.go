@@ -67,6 +67,27 @@ func formatHeaders(h http.Header) string {
 	return b.String()
 }
 
+func formatResponseMetadata(headers, trailers http.Header) string {
+	var b strings.Builder
+	for i, section := range []struct {
+		name string
+		h    http.Header
+	}{{"headers", headers}, {"trailers", trailers}} {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		b.WriteString(section.name)
+		if len(section.h) == 0 {
+			b.WriteString("\n  (none)")
+			continue
+		}
+		for _, line := range strings.Split(formatHeaders(section.h), "\n") {
+			b.WriteString("\n  " + line)
+		}
+	}
+	return b.String()
+}
+
 func headerKeys(h http.Header) []string {
 	keys := make([]string, 0, len(h))
 	for k := range h {

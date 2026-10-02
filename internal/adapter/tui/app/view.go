@@ -25,6 +25,7 @@ const helpText = `commands:
   reload                  reload rpc list for completion
   clear                   clear the screen
   view                    explore the last response (fold, search, y/Y copy)
+  view headers            show the headers and trailers of the last response
   exit                    quit (or ctrl+c)
 
 completion: suggestions pop up while typing • tab/shift+tab select • esc dismiss

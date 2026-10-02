@@ -792,6 +792,53 @@ func TestApp_ViewWithoutResponse(t *testing.T) {
 	}
 }
 
+func TestApp_ViewHeaders(t *testing.T) {
+	ok := okResponse(t)
+	h := newHarness(t, func(ctx context.Context, in usecase.InvokeRPCInput) (usecase.InvokeRPCOutput, error) {
+		out, err := ok(ctx, in)
+		out.Headers = http.Header{"Content-Type": {"application/proto"}, "Set-Cookie": {"session=very-secret-value"}}
+		out.Trailers = http.Header{"X-Trailer": {"2"}}
+		return out, err
+	})
+	h.submit("view headers")
+	if !strings.Contains(h.output(), "no response to view yet") {
+		t.Fatalf("output:\n%s", h.output())
+	}
+
+	h.submit("call CreateUser")
+	h.key(tea.KeyCtrlS)
+	h.key(tea.KeyEnter)
+	h.submit("view headers")
+	out := h.output()
+	if h.app().Mode() != ModeCommand {
+		t.Errorf("view headers should stay at the prompt, mode = %v", h.app().Mode())
+	}
+	for _, want := range []string{"headers", "Content-Type: application/proto", "Set-Cookie: sess…", "trailers", "X-Trailer: 2"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "very-secret-value") {
+		t.Errorf("sensitive header leaked:\n%s", out)
+	}
+}
+
+func TestApp_ViewHeadersOfServerStream(t *testing.T) {
+	h := newHarness(t, okResponse(t))
+	h.model = withStream(h.app(), fakeStream{executeFn: func(_ context.Context, in usecase.InvokeServerStreamInput) (usecase.InvokeServerStreamOutput, error) {
+		_ = in.OnMessage(userMsg(t, "u-1"))
+		return usecase.InvokeServerStreamOutput{Count: 1, Headers: http.Header{"X-Test": {"stream"}}}, nil
+	}})
+	h.submit("call WatchUsers")
+	h.key(tea.KeyCtrlS)
+	h.key(tea.KeyEnter)
+	waitFor(t, h, func() bool { return h.app().Mode() == ModeCommand })
+	h.submit("view headers")
+	if out := h.output(); !strings.Contains(out, "X-Test: stream") || !strings.Contains(out, "trailers\n  (none)") {
+		t.Errorf("output:\n%s", out)
+	}
+}
+
 func withClipboard(m Model, write func(string) (string, error)) Model {
 	m.deps.Clipboard = write
 	return m

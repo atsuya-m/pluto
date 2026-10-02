@@ -117,6 +117,8 @@ func (c Completer) Complete(input string) (string, []Suggestion) {
 		pool = c.rpcs
 	case len(words) == 1 && isOneOf(words[0], "rpcs", "ls"):
 		pool = c.services
+	case len(words) == 1 && isOneOf(words[0], "view"):
+		pool = []Suggestion{{Text: "headers", Description: "show the response headers and trailers"}}
 	case len(words) == 1 && isOneOf(words[0], "header", "headers"):
 		pool = []Suggestion{
 			{Text: "set", Description: "set a header (replaces existing values)"},
