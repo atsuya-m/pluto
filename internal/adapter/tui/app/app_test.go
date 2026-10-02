@@ -219,7 +219,7 @@ func TestApp_CallFlow(t *testing.T) {
 	if h.invoke.callCount() != 1 || h.invoke.calls[0].RPCName != "user.v1.UserService.CreateUser" {
 		t.Errorf("invoke calls = %+v", h.invoke.calls)
 	}
-	if !strings.Contains(h.output(), `"id": "u-1"`) {
+	if !strings.Contains(h.output(), `id: "u-1"`) {
 		t.Errorf("response was not printed:\n%s", h.output())
 	}
 	if !strings.Contains(h.app().View(), "pluto>") {
@@ -292,7 +292,7 @@ func TestApp_ServerStreamFlow(t *testing.T) {
 	waitFor(t, h, func() bool { return h.app().Mode() == ModeCommand })
 
 	out := h.output()
-	for _, want := range []string{"← #1", `"id": "u-1"`, "← #3", `"id": "u-3"`, "stream closed"} {
+	for _, want := range []string{"← #1", `id: "u-1"`, "← #3", `id: "u-3"`, "stream closed"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q:\n%s", want, out)
 		}
@@ -609,7 +609,7 @@ func TestApp_ClientStreamCompose(t *testing.T) {
 	h.key(tea.KeyCtrlX)
 	waitFor(t, h, func() bool { return h.app().Mode() == ModeCommand })
 	out := h.output()
-	for _, want := range []string{"→ #1", `"name": "A"`, "→ #2", `"name": "B"`, "← #1", `"imported": 2`} {
+	for _, want := range []string{"→ #1", `"name": "A"`, "→ #2", `"name": "B"`, "← #1", `imported: 2`} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q:\n%s", want, out)
 		}
@@ -634,7 +634,7 @@ func TestApp_BidiStreamCompose(t *testing.T) {
 	h.key(tea.KeyCtrlS)
 	waitFor(t, h, func() bool { return h.app().streamCount == 1 })
 	out := h.output()
-	if !strings.Contains(out, `"text": "echo: hello"`) || h.app().Mode() != ModeRequestEditor {
+	if !strings.Contains(out, `text: "echo: hello"`) || h.app().Mode() != ModeRequestEditor {
 		t.Fatalf("mode = %v, output:\n%s", h.app().Mode(), out)
 	}
 	if strings.Index(out, "→ #1") > strings.Index(out, "← #1") {
@@ -705,8 +705,8 @@ func TestApp_LargeResponseCanBeExploredWithView(t *testing.T) {
 		t.Fatalf("after sending, the prompt should be ready: mode = %v", h.app().Mode())
 	}
 	out := h.output()
-	if !strings.Contains(out, `"u-49"`) || !strings.Contains(out, "`view` to explore") {
-		t.Errorf("the full body and a hint should be printed:\n%s", out)
+	if strings.Contains(out, `"u-49"`) || !strings.Contains(out, "… 47 more items") || !strings.Contains(out, "`view` to explore") {
+		t.Errorf("a summary and a hint should be printed instead of the full body:\n%s", out)
 	}
 
 	h.submit("view")
@@ -729,7 +729,7 @@ func TestApp_LargeResponseCanBeExploredWithView(t *testing.T) {
 	}
 
 	h.typeText("p")
-	if strings.Count(h.output(), `"u-49"`) != 1 {
+	if strings.Contains(h.output(), `"u-49"`) {
 		t.Error("p no longer prints the body")
 	}
 
@@ -744,7 +744,7 @@ func TestApp_SmallResponseCanBeExplored(t *testing.T) {
 	h.submit("call CreateUser")
 	h.key(tea.KeyCtrlS)
 	h.key(tea.KeyEnter)
-	if h.app().Mode() != ModeCommand || !strings.Contains(h.output(), `"id": "u-1"`) || strings.Contains(h.output(), "`view` to explore") {
+	if h.app().Mode() != ModeCommand || !strings.Contains(h.output(), `id: "u-1"`) || strings.Contains(h.output(), "`view` to explore") {
 		t.Fatalf("small response should be printed without a hint:\n%s", h.output())
 	}
 	h.submit("view")

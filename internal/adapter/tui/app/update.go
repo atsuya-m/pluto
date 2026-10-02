@@ -87,10 +87,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.body, _ = textpresenter.ProtoJSON(msg.Output.Message)
 		m.bodyRPC = msg.Output.RPC.FullName
 		m.resHeaders, m.resTrailers = msg.Output.Headers, msg.Output.Trailers
-		out := renderResponse(m.editor.RPC(), msg.Output, msg.Duration.Round(1e6).String())
-		if lines := strings.Count(m.body, "\n") + 1; lines > m.viewerHeight() {
-			out += "\n" + style.Subtle.Render(fmt.Sprintf("(%d lines • `view` to explore)", lines))
-		}
+		out := m.renderResponse(m.editor.RPC(), msg.Output, msg.Duration.Round(1e6).String())
 		return m, tea.Batch(tea.Println(out), m.command.Focus())
 
 	case streamStartedMsg:
@@ -101,7 +98,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.streamCount++
 		m.lastBody, _ = textpresenter.ProtoJSON(msg.Message)
 		return m, tea.Sequence(
-			tea.Println(renderStreamMessage(m.streamCount, msg.Message)),
+			tea.Println(m.renderStreamMessage(m.streamCount, msg.Message)),
 			waitForStream(m.streamEvents),
 		)
 

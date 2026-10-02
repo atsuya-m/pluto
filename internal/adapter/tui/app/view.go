@@ -8,6 +8,7 @@ import (
 
 	"github.com/atsuya-m/pluto/internal/adapter/presenter/errdetail"
 	textpresenter "github.com/atsuya-m/pluto/internal/adapter/presenter/text"
+	"github.com/atsuya-m/pluto/internal/adapter/tui/jsonview"
 	"github.com/atsuya-m/pluto/internal/adapter/tui/style"
 	"github.com/atsuya-m/pluto/internal/application/usecase"
 )
@@ -97,12 +98,27 @@ func (m Model) explorerView() string {
 	return head + "\n" + m.viewer.View() + notice + "\n" + style.Help.Render(m.viewer.Help()+" • q back")
 }
 
-func renderResponse(rpc usecase.RPCSummary, out usecase.InvokeRPCOutput, duration string) string {
-	body, err := textpresenter.ProtoJSON(out.Message)
+func (m Model) renderResponse(rpc usecase.RPCSummary, out usecase.InvokeRPCOutput, duration string) string {
+	return fmt.Sprintf("%s %s %s\n%s", style.Success.Render("✔"), rpc.FullName, style.Subtle.Render("("+duration+")"), m.renderSnapshot(out.Message))
+}
+
+func (m Model) renderSnapshot(msg proto.Message) string {
+	body, err := textpresenter.ProtoJSON(msg)
 	if err != nil {
-		body = err.Error()
+		return err.Error()
 	}
-	return fmt.Sprintf("%s %s %s\n%s", style.Success.Render("✔"), rpc.FullName, style.Subtle.Render("("+duration+")"), body)
+	width := m.width
+	if width <= 0 {
+		width = 80
+	}
+	out, truncated, err := jsonview.Snapshot([]byte(body), width, max(m.height/2, 10))
+	if err != nil {
+		return body
+	}
+	if truncated {
+		out += "\n" + style.Subtle.Render(fmt.Sprintf("(%d lines in full • `view` to explore)", strings.Count(body, "\n")+1))
+	}
+	return out
 }
 
 func (m Model) streamBanner() string {
@@ -124,12 +140,8 @@ func streamCounts(r result) string {
 	return fmt.Sprintf("%d messages", r.count)
 }
 
-func renderStreamMessage(n int, msg proto.Message) string {
-	body, err := textpresenter.ProtoJSON(msg)
-	if err != nil {
-		body = err.Error()
-	}
-	return style.Subtle.Render(fmt.Sprintf("← #%d", n)) + "\n" + body
+func (m Model) renderStreamMessage(n int, msg proto.Message) string {
+	return style.Subtle.Render(fmt.Sprintf("← #%d", n)) + "\n" + m.renderSnapshot(msg)
 }
 
 func renderSentMessage(n int, msg proto.Message) string {

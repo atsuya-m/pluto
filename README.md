@@ -166,7 +166,26 @@ CreateUser  ›  CreateUserRequest
 
 `C-s` でプレビューを開き、`enter` で送信する。送信中は `esc` でキャンセルできる。
 
-response はスクロールバックに出力され、すぐに次のコマンドを入力できる状態に戻る。端末の高さに収まらない response には `view` で探索できることを示す1行を添える。同じ request を編集し直すときは `edit` を使う。
+response はスクロールバックに出力され、すぐに次のコマンドを入力できる状態に戻る。同じ request を編集し直すときは `edit` を使う。
+
+response（streaming で受信したメッセージも）は、折りたたみビューと同じ `key: value` の形で、大きさによらず同じ規則で要約して出す。
+
+- 配列は先頭 3 件だけを出し、残りは `… N more items` とする
+- 端末の高さの半分に収まる深さまで展開し、それより深い object / array は `{id: "u-001", name: "user01", …}` のように1行のプレビューにする
+- 長い値は画面幅で `…` と省略する
+- 何かを省いたときは最後に ``(N lines in full • `view` to explore)`` を添える。この行がなければ全体が出ている
+
+```text
+✔ user.v1.UserService.ListUsers (4ms)
+users: [25 items]
+  [0]: {id: "u-001", name: "user01", age: 21, status: "USER_STATUS_ACTIVE", tags: [2 items], …}
+  [1]: {id: "u-002", name: "user02", age: 22, status: "USER_STATUS_ACTIVE", tags: [2 items], …}
+  [2]: {id: "u-003", name: "user03", age: 23, status: "USER_STATUS_ACTIVE", tags: [2 items], …}
+  … 22 more items
+(313 lines in full • `view` to explore)
+```
+
+全体は `view` で探索するか、`view` の中で `y` を押して JSON としてコピーする。CLI の出力（`-o text` / `-o json`）は JSON のまま変わらない。
 
 #### 折りたたみビュー
 
